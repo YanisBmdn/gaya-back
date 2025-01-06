@@ -1,12 +1,14 @@
 import logging
-import plotly.io as pio
+import base64
 
-def generate_plotly_chart(json_str: str) -> pio.Figure:
-    try: 
-        fig = pio.from_json(json_str, skip_invalid=False)
-        return fig
-    
-    except ValueError as e:
-        logging.info(f"Error in JSON validation: {e}")
-        fig = pio.Figure()
-        return fig
+import plotly.graph_objects as go
+
+def figure_to_base64(fig: go.Figure) -> str:
+    try:
+        img_bytes = fig.to_image(format="png", engine="kaleido", width=800)
+        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+        return img_base64
+
+    except Exception as e:
+        logging.error(f"Error converting figure to base64: {e}")
+        return ""

@@ -1,8 +1,12 @@
+## Output Types
+VISUALIZATION = "visualization"
+TEXT = "text"
+
 ## LLM models
 GPT_4o_MINI = "gpt-4o-mini"
 
 ## LLM Options
-SYSTEM = "system"
+DEVELOPER = "developer"
 USER = "user"
 
 ## External APIs

@@ -1,14 +1,17 @@
 [
   {
-    "name": "Alex",
-    "tuning": "Prefers moderate complexity and balanced information. Interested in trends and long-term changes but not overly technical. Ideal for general comparisons or historical data."
+     "name": "Alex",
+     "id": 1,
+     "tuning": "A retired 72-year-old who enjoys gardening and local community activities. Has life experience but limited technical background. Prefers simple, clear explanations with large, easy-to-read visualizations. Interested in environmental changes that affect daily life and local community."
   },
   {
-    "name": "Bob",
-    "tuning": "Seeks straightforward, simple insights. Focused on confirming general patterns without requiring detailed analysis. Ideal for surface-level discussions."
+     "name": "Bob",
+      "id": 2,
+     "tuning": "An environmentally conscious 45-year-old urban professional. Follows climate news, understands basic scientific concepts, and is actively interested in sustainability. Wants practical insights and clear connections between data and real-world environmental impacts."
   },
   {
-    "name": "Oscar",
-    "tuning": "Curious and detail-oriented, prefers data linked to specific observations or events. Focused on correlating phenomena like air pollution and ecological impacts."
+     "name": "Oscar",
+      "id": 3,
+     "tuning": "A leading climate research scientist specializing in global environmental modeling. Requires highly technical, precise data analysis using advanced computational methods. Seeks deep, nuanced insights and cutting-edge research interpretations."
   }
-]
+ ]

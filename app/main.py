@@ -1,98 +1,59 @@
-import logging
+from typing import Dict 
 import requests
-import json
+import logging
 import random
-import os
+import json
 
-from dotenv import load_dotenv
-from openai import OpenAI
+import pandas as pd
 from pydantic import BaseModel
+from dotenv import load_dotenv
+from typing import Type
+import plotly.graph_objects as go
 
-from .prompts import CLASSIFYING_PROMPT, SELECTING_API_PROMPT, GENERATE_VISUALIZATION_PROMPT, BUILD_EXTERNAL_QUERY_PROMPT
-from .constants import SYSTEM, USER, GPT_4o_MINI
+from .prompts import *
+from .models import VisualizationNeed, PersonaSelection, APISelection, ProcessedData, OutputType
+from .visualization import figure_to_base64
+from .constants import DEVELOPER, USER, DEVELOPER
 from .api import APIEndpointRegistry, APIType
-from .utils import describe_dict
+from .ai import OpenAIClient
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
 load_dotenv()
 
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-)
+openai_client = OpenAIClient()
 
-
-
-def detect_visualization_need(text: str) -> int:
+def classify_text(text: str, classification_prompt: str, response_format: Type[BaseModel], max_tokens: int = 20) -> BaseModel:
     """
-    Determine if the given text suggests a need for visualization.
+    Classify the given text based on the provided prompt.
 
     Args:
         text (str): Input text to analyze
+        classification_prompt (str): The prompt to use for classification
+        response_format (BaseModel): The Pydantic model to use for the response format
 
     Returns:
-        int: 1 if visualization is needed, 0 otherwise
+        BaseModel: The classified result parsed into the specified response format
     """
     try:
-        response = client.chat.completions.create(
-            model=GPT_4o_MINI,
+
+        response = openai_client.structured_completion(
             messages=[
-                {"role": SYSTEM, "content": CLASSIFYING_PROMPT},
+                {"role": DEVELOPER, "content": classification_prompt},
                 {
                     "role": USER,
-                    "content": f"Classify if this text needs visualization:\n\n{text}",
+                    "content": f"Classify this text:\n\n{text}",
                 },
             ],
-            max_tokens=1,
+            response_format=response_format,
+            max_tokens=max_tokens,
             temperature=0,
         )
 
-        result = response.choices[0].message.content.strip()
-        return int(result) if result in ["0", "1"] else 0
+        return response
 
     except Exception as e:
-        logging.error(f"Error in visualization need detection: {e}")
-        return 0
-
-
-class APISelection(BaseModel):
-    url: str
-
-
-def select_api(prompt: str) -> str:
-    """
-    Determine what API to query based on the user demand.
-
-    Args:
-        text (str): Input text to analyze
-
-    Returns:
-        str: API endpoint to query
-    """
-    try:
-        response = client.beta.chat.completions.parse(
-            model=GPT_4o_MINI,
-            messages=[
-                {"role": SYSTEM, "content": SELECTING_API_PROMPT},
-                {
-                    "role": USER,
-                    "content": prompt,
-                },
-            ],
-            max_tokens=20,
-            temperature=0,
-            response_format=APISelection,
-        )
-
-        result = response.choices[0].message.parsed.url
-        known_endpoints = APIEndpointRegistry.get_endpoints(APIType.OPEN_METEO)
-        for endpoint in known_endpoints:
-            if result == endpoint.full_url:
-                return result
-        return None
-
-    except Exception as e:
-        logging.error(f"Error in API selection: {e}")
+        logging.error(f"Error in text classification: {e}")
         return None
 
 def build_external_api_query(api_endpoint: str, prompt: str) -> dict:
@@ -106,12 +67,11 @@ def build_external_api_query(api_endpoint: str, prompt: str) -> dict:
         dict: A dictionary of parameters for the API query
     """
     try:
-        system_prompt = str.format(BUILD_EXTERNAL_QUERY_PROMPT, api_endpoint=api_endpoint, api_endpoint_parameters=APIEndpointRegistry()._get_endpoint_parameters(api_endpoint))
+        DEVELOPER_prompt = str.format(BUILD_EXTERNAL_QUERY_PROMPT, api_endpoint=api_endpoint, api_endpoint_parameters=APIEndpointRegistry()._get_endpoint_parameters(api_endpoint))
 
-        response = client.beta.chat.completions.parse(
-            model=GPT_4o_MINI,
+        response = openai_client.structured_completion(
             messages=[
-                {"role": SYSTEM, "content": system_prompt},
+                {"role": DEVELOPER, "content": DEVELOPER_prompt},
                 {
                     "role": USER,
                     "content": prompt,
@@ -120,25 +80,59 @@ def build_external_api_query(api_endpoint: str, prompt: str) -> dict:
             max_tokens=100,
             temperature=0,
             response_format=APISelection
+            
         )
 
-        result = response.choices[0].message.parsed.url
+        result = response.url
         return result
 
     except Exception as e:
         logging.error(f"Error in API query parameter building: {e}", exc_info=True)
         return None
 
-class VisualizationType(BaseModel):
-    json_definition: str
 
-def generate_visualization(data, prompt) -> dict:
+
+def data_preprocessing(data: pd.DataFrame) -> ProcessedData:
+    """
+    Preprocess the data by separating nested and non-nested columns into separate dataframes.
+    
+    Args:
+        data (pd.DataFrame): The input dataframe containing potential nested columns
+        
+    Returns:
+        ProcessedData: A container with the main dataframe and dictionary of nested dataframes
+    """
+    # Create a copy of the original data
+    main_data = data.copy()
+    nested_dataframes = {}
+    
+    # Identify and process nested columns (columns containing lists or dictionaries)
+    for column in main_data.columns:
+        # Check if the column contains nested data (lists or dictionaries)
+        if (
+            len(main_data[column]) > 0 
+            and isinstance(main_data[column].iloc[0], (list, dict))
+        ):
+            # Convert the nested column to a dataframe
+            nested_df = pd.DataFrame(main_data[column].tolist())
+            nested_dataframes[column] = nested_df
+            main_data.drop(columns=[column], inplace=True)
+    
+    return ProcessedData(main_data=main_data, nested_dataframes=nested_dataframes)
+
+def generate_visualization(data: pd.DataFrame, complexity_level: str, prompt: str, additional_data: Dict[str, pd.DataFrame]) -> dict:
     try:
-        visualization_prompt = str.format(GENERATE_VISUALIZATION_PROMPT, data_description=describe_dict(data))
-        response = client.beta.chat.completions.parse(
-            model=GPT_4o_MINI,
+        additional_data_description = ""
+        if additional_data:
+            for key, value in additional_data.items():
+                additional_data_description += f"{key}:\n{value.head()} \n shape:{value.shape}\n\n"
+
+        visualization_prompt = str.format(GENERATE_VISUALIZATION_PROMPT, data_description=data.head(), nested_dataframes_description=additional_data_description)
+        
+        response = openai_client.completion(
             messages=[
-                {"role": SYSTEM, "content": visualization_prompt},
+                {"role": DEVELOPER, "content": visualization_prompt},
+                {"role": DEVELOPER, "content": f"Here is the complexity_level for the user you are going to answer. The visualization should fit {complexity_level}"},
                 {
                     "role": USER,
                     "content": f"{prompt}",
@@ -146,42 +140,124 @@ def generate_visualization(data, prompt) -> dict:
             ],
             max_tokens=5000,
             temperature=0,
-            response_format=VisualizationType
         )
         
-        result = response.choices[0].message.parsed.json_definition
-        return result
+        return response
     except Exception as e:
-        logging.error(f"Error in visualization generation: {e}")
+        logging.error("Error in visualization generation", exc_info=True)
         return None
 
 
-def main():
+def set_complexity_level(persona: str, output_type: OutputType) -> str:
+    """
+    Set the complexity level based on the persona.
+
+    Args:
+        persona (str): The persona name
+
+    Returns:
+        str: The complexity level prompt
+    """
+    try:
+        with open('personas.json', 'r') as file:
+            personas = json.load(file)
+        
+        user_description = next((p['tuning'] for p in personas if p['name'] == persona), None)
+        
+        if not user_description:
+            raise ValueError(f"Persona '{persona}' not found in personas.json")
+
+        complexity_level = classify_text(user_description, COMPLEXITY_MATCHING_PROMPT, PersonaSelection).persona_id
+
+        if complexity_level == 0:
+            return LVL0_VIZ_PROMPT if output_type == OutputType.VISUALIZATION else LVL0_EXP_PROMPT
+        elif complexity_level == 1:
+            return LVL1_VIZ_PROMPT if output_type == OutputType.VISUALIZATION else LVL1_EXP_PROMPT
+        elif complexity_level == 2:
+            return LVL2_VIZ_PROMPT if output_type == OutputType.VISUALIZATION else LVL2_EXP_PROMPT
+        else:
+            raise ValueError("Invalid complexity level")
+
+    except Exception as e:
+        logging.error(f"Error setting complexity level: {e}", exc_info=True)
+        return None
+
+def describe_visualization(data: ProcessedData, complexity_level: str,fig: go.Figure) -> str:
+
+    """data_description = ""
+    data_description += f"describe:{data.main_data.describe()}\n\n"
+    for key, value in data.nested_dataframes.items():
+        data_description += f"key:{key} \n describe:{value.describe()}\n\n"
+"""
+    base64_image = figure_to_base64(fig)
+    try:
+        response = openai_client.completion(
+            messages=[
+                {"role": DEVELOPER, "content": GENERATE_EXPLANATION_PROMPT},
+                {"role": DEVELOPER, "content": complexity_level},
+                {"role": USER, "content": [
+                    {
+                        "type": "text",
+                        "text": f"Please explain this visualization"
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": { "url": f"data:image/png;base64,{base64_image}"},
+                    },
+                ]},
+            ],
+            max_tokens=5000,
+        )
+        del base64_image
+        return response
+    except Exception:
+        logging.error("Error in visualization explanation generation", exc_info=True)
+        return None
+
+
+
+def main() -> tuple[callable, pd.DataFrame]:
     with open('mock.json', 'r') as file:
         conversations = json.load(file)
 
     # Select a random conversation
-    conversation = random.choice(conversations)
+    #conversation = random.choice(conversations)
 
-
-
-    logging.info(f"Conversation: {conversation}")
+    conversation = conversations[0]
 
     for message in conversation['messages']:
-        if detect_visualization_need(message['message']):
+        print(message)
+
+    for message in conversation['messages']:
+        if classify_text(message['message'], VISUALIZATION_NEED_PROMPT, VisualizationNeed).need_visualization:
             logging.info(f"Visualization needed for message: {message['message']}")
             
-            api_endpoint = select_api(message['message'])
-            logging.info(f"Selected API endpoint: {api_endpoint}")
-            if api_endpoint:
-                query = build_external_api_query(api_endpoint, message['message'])
-                logging.info(f"Query {query}")
-            
-                response = requests.get(query)
-                if response.status_code == 200:
-                    data = response.json()
-                    logging.info(f"Data retrieved: {describe_dict(data)}")
+            api_endpoint = classify_text(message['message'], SELECTING_API_PROMPT, APISelection, max_tokens=20).url
 
-                    return generate_visualization(data, message['message']), data
-                else:
-                    logging.error(f"Error retrieving data: {response.text}")
+            known_endpoints = APIEndpointRegistry.get_endpoints(APIType.OPEN_METEO)
+            for endpoint in known_endpoints:
+                if api_endpoint == endpoint.full_url:
+                    logging.info(f"Selected API endpoint: {api_endpoint}")
+                    if api_endpoint:
+                        query = build_external_api_query(api_endpoint, message['message'])
+                        logging.info(f"Query {query}")
+                    
+                        response = requests.get(query)
+                        if response.status_code == 200:
+                            data = pd.read_json(json.dumps(response.json()))
+
+                            print(data)
+                            data = data_preprocessing(data)
+
+                            complexity_level = set_complexity_level(message['persona'], OutputType.VISUALIZATION)
+                            visualization_code = generate_visualization(data.main_data, complexity_level, message['message'], data.nested_dataframes)
+                            exec(visualization_code)
+                            
+                            fig = locals().get('visualize')(data)
+
+                            complexity_level = set_complexity_level(message['persona'], OutputType.TEXT)
+                            description = describe_visualization(data, complexity_level, fig)
+
+                            return fig, description
+                        else:
+                            logging.error(f"Error retrieving data: {response.text}")
