@@ -32,6 +32,27 @@ class ProcessedData:
     main_data: pd.DataFrame
     nested_dataframes: Dict[str, pd.DataFrame]
 
+    @staticmethod
+    def generate_description(dataframes_dict: Dict[str, pd.DataFrame]) -> str:
+        """
+        Generate a formatted description of multiple dataframes
+        Args:
+            dataframes_dict: Dictionary of dataframe name and corresponding dataframe
+        Returns:
+            Formatted string describing each dataframe
+        """
+        if not dataframes_dict:
+            return ""
+            
+        descriptions = []
+        for name, df in dataframes_dict.items():
+            descriptions.append(
+                f"Dataset: {name}\n"
+                f"Preview:\n{df.head()}\n"
+                f"Shape: {df.shape}"
+            )
+            
+        return "\n\n".join(descriptions)
 
 class OutputType(Enum):
     VISUALIZATION = "visualization"

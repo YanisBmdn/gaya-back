@@ -115,33 +115,35 @@ def visualization(data: ProcessedData) -> go.Figure:
 GENERATE_EXPLANATION_PROMPT = """
 You are tasked with providing clear, engaging descriptions of climate and environmental visualizations. 
 Your description should help viewers understand the real-world implications of the data being presented.
-Please provide a description that includes:
+Please provide a concise and informative description that includes:
 
-# OVERVIEW
+OVERVIEW
 What is the main message or story this visualization tells?
 What environmental or climate aspect does it address?
 What time period or geographic scope is covered?
 
-# TECHNICAL ELEMENTS
+TECHNICAL ELEMENTS
 What type of visualization is used (chart type, graph style, etc.)?
 What are the key variables being shown?
 What units of measurement are used?
 What is the timeframe?
 
 
-# KEY FINDINGS
+KEY FINDINGS
 What are the most significant patterns or trends?
 What are the notable high points, low points, or turning points?
 Are there any unexpected or surprising elements?
 
 
-# REAL-WORLD CONTEXT
+REAL-WORLD CONTEXT
 How does this data relate to everyday life?
 What are the practical implications of these findings?
 How might this information influence decision-making or policy?
 
 Example Structure:
 "This [visualization type] shows [main topic] from [timeframe], highlighting [key finding]. The data, sourced from [source], reveals [significant pattern/trend]. Notable features include [specific points of interest]. These findings are particularly relevant because [real-world connection]. Understanding this visualization helps us [practical application], suggesting that [implication/action item]."
+
+Use minimal markdown for formatting and ensure the response is clear, concise, and engaging. Don't over simplify.
 """
 
  

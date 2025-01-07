@@ -1,8 +1,8 @@
 from typing import Dict 
 import requests
 import logging
-import random
 import json
+import random
 
 import pandas as pd
 from pydantic import BaseModel
@@ -31,7 +31,7 @@ def classify_text(text: str, classification_prompt: str, response_format: Type[B
         text (str): Input text to analyze
         classification_prompt (str): The prompt to use for classification
         response_format (BaseModel): The Pydantic model to use for the response format
-
+        max_tokens (int): The maximum number of tokens to generate
     Returns:
         BaseModel: The classified result parsed into the specified response format
     """
@@ -56,7 +56,8 @@ def classify_text(text: str, classification_prompt: str, response_format: Type[B
         logging.error(f"Error in text classification: {e}")
         return None
 
-def build_external_api_query(api_endpoint: str, prompt: str) -> dict:
+
+def build_api_query(api_endpoint: str, prompt: str) -> dict:
     """
     Build the query to request the chosen external external API.
 
@@ -77,7 +78,6 @@ def build_external_api_query(api_endpoint: str, prompt: str) -> dict:
                     "content": prompt,
                 },
             ],
-            max_tokens=100,
             temperature=0,
             response_format=APISelection
             
@@ -91,7 +91,6 @@ def build_external_api_query(api_endpoint: str, prompt: str) -> dict:
         return None
 
 
-
 def data_preprocessing(data: pd.DataFrame) -> ProcessedData:
     """
     Preprocess the data by separating nested and non-nested columns into separate dataframes.
@@ -102,32 +101,34 @@ def data_preprocessing(data: pd.DataFrame) -> ProcessedData:
     Returns:
         ProcessedData: A container with the main dataframe and dictionary of nested dataframes
     """
-    # Create a copy of the original data
     main_data = data.copy()
     nested_dataframes = {}
     
-    # Identify and process nested columns (columns containing lists or dictionaries)
     for column in main_data.columns:
-        # Check if the column contains nested data (lists or dictionaries)
         if (
             len(main_data[column]) > 0 
             and isinstance(main_data[column].iloc[0], (list, dict))
         ):
-            # Convert the nested column to a dataframe
             nested_df = pd.DataFrame(main_data[column].tolist())
             nested_dataframes[column] = nested_df
             main_data.drop(columns=[column], inplace=True)
     
     return ProcessedData(main_data=main_data, nested_dataframes=nested_dataframes)
 
-def generate_visualization(data: pd.DataFrame, complexity_level: str, prompt: str, additional_data: Dict[str, pd.DataFrame]) -> dict:
-    try:
-        additional_data_description = ""
-        if additional_data:
-            for key, value in additional_data.items():
-                additional_data_description += f"{key}:\n{value.head()} \n shape:{value.shape}\n\n"
+def generate_visualization(data: ProcessedData, complexity_level: str, prompt: str) -> dict:
+    """
+    Generate a visualization based on the given data and complexity level.
 
-        visualization_prompt = str.format(GENERATE_VISUALIZATION_PROMPT, data_description=data.head(), nested_dataframes_description=additional_data_description)
+    Args:
+        data (pd.DataFrame): The dataframe to visualize
+        complexity_level (str): The complexity level of the user
+        prompt (str): The user's prompt
+        additional_data (Dict[str, pd.DataFrame]): Dictionary of additional nested dataframes
+    """
+    try:
+        additional_data_description = ProcessedData.generate_description(data.nested_dataframes)
+
+        visualization_prompt = str.format(GENERATE_VISUALIZATION_PROMPT, data_description=data.main_data.head(), nested_dataframes_description=additional_data_description)
         
         response = openai_client.completion(
             messages=[
@@ -190,6 +191,7 @@ def describe_visualization(data: ProcessedData, complexity_level: str,fig: go.Fi
         data_description += f"key:{key} \n describe:{value.describe()}\n\n"
 """
     base64_image = figure_to_base64(fig)
+    nested_df_info = ProcessedData.generate_description(data.nested_dataframes)
     try:
         response = openai_client.completion(
             messages=[
@@ -198,7 +200,7 @@ def describe_visualization(data: ProcessedData, complexity_level: str,fig: go.Fi
                 {"role": USER, "content": [
                     {
                         "type": "text",
-                        "text": f"Please explain this visualization"
+                        "text": f"Please explain this visualization. Here's a brief description of the data:\n\n{nested_df_info}",
                     },
                     {
                         "type": "image_url",
@@ -221,9 +223,9 @@ def main() -> tuple[callable, pd.DataFrame]:
         conversations = json.load(file)
 
     # Select a random conversation
-    #conversation = random.choice(conversations)
+    conversation = random.choice(conversations)
 
-    conversation = conversations[0]
+    # conversation = conversations[0]
 
     for message in conversation['messages']:
         print(message)
@@ -239,21 +241,24 @@ def main() -> tuple[callable, pd.DataFrame]:
                 if api_endpoint == endpoint.full_url:
                     logging.info(f"Selected API endpoint: {api_endpoint}")
                     if api_endpoint:
-                        query = build_external_api_query(api_endpoint, message['message'])
+                        query = build_api_query(api_endpoint, message['message'])
                         logging.info(f"Query {query}")
                     
                         response = requests.get(query)
                         if response.status_code == 200:
                             data = pd.read_json(json.dumps(response.json()))
 
-                            print(data)
                             data = data_preprocessing(data)
 
                             complexity_level = set_complexity_level(message['persona'], OutputType.VISUALIZATION)
-                            visualization_code = generate_visualization(data.main_data, complexity_level, message['message'], data.nested_dataframes)
-                            exec(visualization_code)
+                            visualization_code = generate_visualization(data, complexity_level, message['message'])
                             
-                            fig = locals().get('visualize')(data)
+                            try:
+                                exec(visualization_code)
+                                fig = locals().get('visualize')(data)
+                            except Exception:
+                                logging.error(f"Error executing visualization:", exc_info=True)
+                                return
 
                             complexity_level = set_complexity_level(message['persona'], OutputType.TEXT)
                             description = describe_visualization(data, complexity_level, fig)
