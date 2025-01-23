@@ -1,12 +1,11 @@
-from app.api import APIEndpointRegistry, APIType
-
 #########################
 ## Classification Prompts
 #########################
 
 VISUALIZATION_NEED_PROMPT = """
 You are a precise classifier. Determine if the given text suggests a need for environmental data visualization.
-Respond ONLY with 1 if visualization is needed, or 0 if not. 
+Set the need_visualization variable ONLY to 1 if visualization is needed, or 0 if not.
+Set the topic_of_interest variable to the main topic of interest mentioned in the text. It MUST be related to climate change (e.g., temperature trends, air quality, precipitation).
 Consider broad interpretations of visualization needs, including trends, patterns, comparisons, or spatial/temporal analyses.
 """
 
@@ -21,132 +20,245 @@ Choose the most suitable complexity level from the following options:
 2 - Expert: In-depth technical analysis, precise scientific language, advanced models, and nuanced insights with a scholarly tone.
 """
 
-SELECTING_API_PROMPT = f"""
-You are an API expert. Choose the best API for the given user demand.
-Select from the following endpoints : {APIEndpointRegistry().get_endpoints(APIType.OPEN_METEO)}
-You should ONLY return the full URL for the selected endpoint.
-"""
-
 ########################
 ## Visualization Prompts
 ########################
 
-GENERATE_VISUALIZATION_PROMPT = """
-# Data Visualization Requirements
-You are a Python visualization expert. You only return executable Python code with no explanations.
-The output should contain nothing but raw python code - no comments, descriptions or explanations or code block markers are needed.
+DETERMINE_VISUALIZATION_TYPE_PROMPT = """
+Your task is to recommend a climate change visualization using OpenMeteo API data.
+The visualization will ONLY use Open-Meteo data, which includes things such as current weather data, historical weather data, and weather forecasts including temperature, precipitation, wind speed/direction, humidity, and air quality parameters (like PM2.5, PM10, and various gases).
 
-## Output Requirements
-Your only output should be a function with this exact signature:
+Topic: {topic_of_interest}
+User Persona: {persona}
+Complexity Level: {complexity_level}
 
-```
-def visualize(data: ProcessedData) -> go.Figure:
-    \"\"\"
-    Create a Plotly visualization using the provided ProcessedData instance.
-    Args:
-        data (ProcessedData): Instance containing main_data and nested_dataframes
-    \"\"\"
-```
+Guidelines:
+- Focus on patterns or trends that are relevant to climate change analysis
+- If relevant, consider having subplots or multiple traces (e.g., comparing different locations)
+- Include relevant baselines
+- Match complexity to user expertise level
+- Visualization is achievable ONLY with data from OpenMeteo such as temperature and precipitation.
+- The visualization shouldn't use any external data sources, assets or icons. Use ONLY OpenMeteo data.
 
-## Data Structure
-The input `data` parameter is an instance of ProcessedData class with two main components:
-1. `data.main_data`: A pandas DataFrame containing metadata
-2. `data.nested_dataframes`: A dictionary of pandas DataFrames containing hourly, daily or other time-series data
-   - Access nested data using: `data.nested_dataframes['dataframe_name']`
+Reference Examples by Complexity:
 
-```
-# How the data variable is structured:
-data.main_data = {data_description}
+1. Beginner Level:
+Visualization Name: "Yearly Temperature Change"
+Chart Type: Line chart
+Climate Change Focus: Simple yearly temperature trend
+Visual Elements:
+- Single line of yearly average temperatures
+- X-axis: years (2000-2023)
+- Y-axis: temperature in °C
 
-# How the nested dataframes are structured:
-data.nested_dataframes = {nested_dataframes_description}
+2. Intermediate Level:
+Visualization Name: "Pollution comparison between Japan's main cities"
+Chart Type: Line chart
+Climate Change Focus: Pollution levels in different cities
+Visual Elements:
+- Multiple lines for different cities
+- X-axis: daily time series
+- Y-axis: pollution levels (PM2.5, PM10)
+- Color-coded lines for each city
 
-# Main DataFrame accessed like:
-data.main_data['column_name']  # Series containing column data
+3. Expert Level:
+Visualization Name: "Heatmap highlighting monthly Temperature Anomalies"
+Chart Type: Heatmap
+Climate Change Focus: Monthly temperature deviations from baseline
+Visual Elements:
+- X-axis: months (Jan-Dec)
+- Y-axis: years (1980-2023)
+- Color scale: temperature anomalies in °C
+- Baseline period: 1951-1980
+"""
 
-# Nested DataFrames accessed like:
-data.nested_dataframes['daily']  # DataFrame with columns: [column1, column2, ...]
-data.nested_dataframes['hourly']      # DataFrame with columns: [column1, column2, ...]
-```
+DETERMINE_NEEDED_DATA_PROMPT = """
+Your current task is to determine the needed data from OpenMeteo API for a climate visualization. You should only consider OpenMeteo API data.
+The visualization type has been defined by another expert as following:
+{visualization_type}
 
-## Technical Requirements
-1. Use ONLY Plotly for visualization
-2. The ONLY output should be the **visualization()** function provided above
-3. Provide the raw code without without code block markers (```) or any surrounding text
-4. Access data ONLY through:
-   - `data.main_data[column_name]`
-   - `data.nested_dataframes[dataframe_name][column_name]`
-5. Ensure the function is self-contained and does not rely on external variables
+And the following available data from OpenMeteo API:
+# API Endpoint Information
+{API_ENDPOINT_INFORMATION}
 
-## Example Output
+Provide three outputs in this format:
 
-import plotly.graph_objects as go
+# Output Example
+Visualization Type: Line chart showing annual temperature trends and 5-year moving average
+Raw temperature data line
+5-year moving average line
+X-axis: years (1980-2023)
+Y-axis: temperature in °C
 
-def visualization(data: ProcessedData) -> go.Figure:
-    fig = go.Figure()
+needed_data:
+Daily mean temperature (temperature_2m_mean)
+Time range: 1980-2023
+Geographic scope: Single location (London, UK)
+Resolution: Daily values to be aggregated to annual
+
+
+data_processing_steps:
+Step 1: Calculate annual average temperatures
+Step 2: Compute 5-year moving average
+"""
+
+RETRIEVE_DATA_PROMPT = """
+Your current task is to retrieve the needed data for a climate visualization.
+The visualization type and needed data have already been defined, as following : 
+
+# Visualization Type
+{visualization_type}
+
+# Needed Data
+{needed_data}
+
+# API Endpoint Information
+{API_ENDPOINT_INFORMATION}
+
+Your task is to define the API endpoint and inline-parameters to retrieve the required data.
+If not mentionned, the location should be set to Nagoya, Japan.
+Be careful about the potential amount of data that could be returned (ex. hourly data of 10 years or more isn't acceptable).
+DON'T HALLUCINATE ON THE PARAMETERS AND THE DATA. IF DATA ISN'T AVAILABLE IN WHAT WAS PROVIDED, DON'T INCLUDE IT.
+
+# Output Example
+Daily minimum, maximum and mean temperature in Nagoya, Japan from 2015-01-18 to 2025-02-01
+url="https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2015-01-18&end_date=2025-02-01&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean"
+
+Hourly PM10 and PM2.5 concentration in Nagoya, Japan from 2015-01-01 to 2025-01-01
+url="https://air-quality-api.open-meteo.com/v1/air-quality?latitude=35.1815&longitude=136.9064&hourly=pm10,pm2_5&start_date=2015-01-01&end_date=2025-01-01"
+"""
+
+PROCESS_DATA_PROMPT = """
+Your current task is to create a function to process raw climate data for visualization.
+You should only return python code that will be then executed with python ```exec()```. Your response shouldn't contain any additional text or comments.
+Given:
+- Visualization Goal: {visualization_type}
+- Processing Plan: {processing_steps}
+- Input Data Structure: {data_description}
+
+Here's the output format of the function you need to create:
+
+@dataclass
+class ProcessedData:
+    A generic container for processed dataframes.
     
-    try:
-        if 'daily' in data.nested_dataframes:
-            daily = data.nested_dataframes['daily']
-            if 'temperature_2m_max' in daily:
-                fig.add_trace(
-                    go.Scatter(
-                        x=daily.index,
-                        y=daily['temperature_2m_max'].fillna(method='ffill'),
-                        name='Temperature',
-                        line=dict(color='red')
-                    )
-                )
-    except Exception as e:
-        print(f"Error: e")
-    
-    fig.update_layout(
-        title_text="Daily Temperature",
-        yaxis_title="Temperature (°C)"
-    )
+    Attributes:
+        main_data (pd.DataFrame): The base dataframe with non-nested columns
+        nested_dataframes (dict[str, pd.DataFrame]): Dictionary of expanded nested dataframes
+    main_data: pd.DataFrame
+    nested_dataframes: dict[str, pd.DataFrame]
 
-    return fig
+
+Create a data processing function with:
+def process_raw_data(data: pd.DataFrame) -> ProcessedData:
+    '''
+    Process raw climate data for visualization.
+    '''
+
+Requirements:
+1. Handle missing or invalid data
+2. Validate input data structure
+3. Optimize for performance with large datasets
+4. Return clean, visualization-ready DataFrame
+5. Add all imports necessary to your code.
+5. You should only use pandas and numpy for data processing. No additional libraries are allowed
+"""
+
+BUILD_VISUALIZATION_PROMPT = """
+You have 2 tasks. First, you need to process the raw data for the defined visualization. Second, you need to create a Plotly visualization based on the processed data.
+- Visualization goal: {visualization_type}
+- Complexity Level: {complexity_level}
+- Processing Steps: {processing_steps}
+
+Your only output should be a function that encapsulate both tasks (processing and visualization) with this signature:
+def visualize(data: List[NormalizedOpenMeteoData]) -> go.Figure:
+    '''
+    Process raw climate data from OpenMeteo API and generate a Plotly visualization.
+    '''
+    import pandas as pd
+    import numpy as np
+    import plotly.graph_objects as go
+
+
+Information:
+- NormalizedOpenMeteoData is a dataclass with the following structure:
+    metadata: Optional[pd.DataFrame] = Field(description="Dataframe containing data unrelated to time resolution")
+    hourly_data: Optional[pd.DataFrame] = Field(description="Dataframe with hourly data")
+    daily_data: Optional[pd.DataFrame] = Field(description="Dataframe with daily data")
+
+Here's a preview of the data:
+{data_preview}
+
+
+# Data processing requirements:
+    1. Handle missing or invalid data
+    2. Validate input data structure
+    3. Optimize for performance with large datasets
+
+# Visualization requirements:
+    1. Clear axes labels and title
+    2. Legend if multiple traces
+    3. Optimized for performance
+    4. Be careful about overlapping elements. Don't clutter the visualization
+    5. The visualization will be viewed on a standard desktop screen.
+
+# Output Requirements:
+    1. The only output should be the visualize() function
+    2. Provide the raw code without code block markers or any surrounding text
+    3. Ensure the function is self-contained and does not rely on external variables
+    4. Use ONLY Plotly, numpy, pandas and python standard libraries.
+    5. You must add imports, aliases, and any necessary code to make the function executable.
 """
 
 ########################
 ## Explanation Prompts
 ########################
 
-GENERATE_EXPLANATION_PROMPT = """
-You are tasked with providing clear, engaging descriptions of climate and environmental visualizations. 
-Your description should help viewers understand the real-world implications of the data being presented.
-Please provide a concise and informative description that includes:
+EXPLANATION_PLAN_PROMPT = """
+Given a climate visualization, create a detailed explanation plan that will help facilitate public understanding and discussion. Structure your response as follows:
 
-OVERVIEW
-What is the main message or story this visualization tells?
-What environmental or climate aspect does it address?
-What time period or geographic scope is covered?
-
-TECHNICAL ELEMENTS
-What type of visualization is used (chart type, graph style, etc.)?
-What are the key variables being shown?
-What units of measurement are used?
-What is the timeframe?
+# Visual Elements Analysis
+List the key visual components present in the visualization
+Identify the data representations used (charts, graphs, colors, etc.)
+Note any significant patterns or trends immediately visible
 
 
-KEY FINDINGS
-What are the most significant patterns or trends?
-What are the notable high points, low points, or turning points?
-Are there any unexpected or surprising elements?
+# Core Message Identification
+What is the primary climate-related message this visualization conveys?
+Which specific climate aspects or issues are being highlighted?
+What is the temporal and geographic scope of the data?
 
 
-REAL-WORLD CONTEXT
-How does this data relate to everyday life?
-What are the practical implications of these findings?
-How might this information influence decision-making or policy?
+# Technical Accuracy Assessment
+Highlight any statistical or scientific concepts that need explanation
 
-Example Structure:
-"This [visualization type] shows [main topic] from [timeframe], highlighting [key finding]. The data, sourced from [source], reveals [significant pattern/trend]. Notable features include [specific points of interest]. These findings are particularly relevant because [real-world connection]. Understanding this visualization helps us [practical application], suggesting that [implication/action item]."
 
-Use minimal markdown for formatting and ensure the response is clear, concise, and engaging. Don't over simplify.
+# Public Engagement Considerations
+Which aspects might be most relevant to public discourse?
+What common misconceptions might this visualization address?
+Which elements might need additional context for public understanding?
+
+
+# Discussion Points
+List key questions this visualization might prompt
+Identify potential topics for group discussion
+Note any related climate issues this could lead into
+
+Please provide a structured outline addressing these elements that will guide the detailed explanation.
+"""
+EXPLANATION_GENERATION_PROMPT = """
+Based on the explanation plan provided, generate a comprehensive yet accessible explanation of the climate visualization. Your explanation should:
+
+{explanation_plan}
+
+Here's information about the data that has been used
+{data_description}
+
+Ensure your explanation is clear, short and engaging.
+Use clear, accessible language while maintaining scientific accuracy. Avoid jargon where possible, but explain necessary technical terms. Include relevant comparisons and real-world examples to make the information more relatable.
 """
 
- 
+
 ###########################
 ## Complexity Level Prompts
 ###########################
@@ -157,7 +269,7 @@ You are interacting with a user who is new to climate science, environmental stu
 - Provide clear, basic explanations
 - If relevant break down complex concepts into easy-to-understand analogies
 - Use visual metaphors and straightforward illustrations
-- Avoid scientific jargon
+- Avoid scientific jargon. If it is needed, provide explanation of the terms (difficult term ex: "CO2", "PM2.5", "NOx"...etc)
 - Explain the significance of the visualization in accessible terms
 - Focus on building foundational understanding
 - Encourage curiosity and learning
@@ -235,24 +347,19 @@ You are generating visualizations for users with expertise in data visualization
 ## Misc Prompts
 ################
 
-BUILD_EXTERNAL_QUERY_PROMPT = """
-Provide the full URL with accurate parameters based on the user prompt for this API endpoint : ```{api_endpoint}```.
-If the user hasn't specified it, base the location in Nagoya, Japan.
-If not specified the timescale should be the past 2 years.
-Here are some examples with the url and parameters:
-
-Air Quality in Nagoya
-```https://air-quality-api.open-meteo.com/v1/air-quality?latitude=35.1815&longitude=136.9064&hourly=pm10,pm2_5```
-
-Temperatures in Fuji for the past 10 years
-```https://archive-api.open-meteo.com/v1/archive?latitude=35.1667&longitude=138.6833&start_date=2014-11-17&end_date=2024-12-01&hourly=temperature_2m```
-
-Here is the parameters documentation for the endpoint: 
-{api_endpoint_parameters}
+OUTPUT_LANGUAGE_PROMPT = """
+For your answer, whether it's code, text or a visualization provide all the text that will be shown to the user in English.
+This includes any labels, titles, descriptions, or explanations that will be directly visible to the user.
+If your output is code, it should follow conventions and be written using English.
 """
 
-OUTPUT_LANGUAGE_PROMPT = """
-If your answer is some sort of explanation, please use French only.
-For code generation, use Python only and in English.
-For visualization labels and legends, use Japanese
+ANTHROPIC_SYSTEM_PROMPT = """
+You are a climate visualization expert and teacher. You are part of a process to generate a climate visualization with other experts.
+Your role is to adapt to your audience knowledge level and provide clear visualization and explanations to help understand how climate change affects their environment.
+"""
+
+ANTHROPIC_STRUCTURED_OUTPUT_PROMPT = """
+You must respond with valid JSON that STRICTLY AND EXACTLY matches this Python type:
+{response_format}
+Respond only with the JSON, no other text.
 """

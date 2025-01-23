@@ -1,0 +1,136 @@
+[
+  {
+    "url": "https://archive-api.open-meteo.com/v1/archive",
+    "description": "Historical weather data archive endpoint that provides access to past weather conditions including temperature, precipitation, wind, and other meteorological variables.",
+    "parameters": {
+      "required_parameters": {
+        "latitude": "Floating-point; Geographical coordinates (e.g., 52.52,48.85)",
+        "longitude": "Floating-point; Geographical coordinates (e.g., 52.52,48.85)",
+        "start_date": "String (yyyy-mm-dd); Date range for weather data",
+        "end_date": "String (yyyy-mm-dd); Date range for weather data"
+      },
+      "hourly_parameters": {
+        "temperature_2m": "Instant, °C (°F); Air temperature at 2 meters",
+        "relative_humidity_2m": "Instant, %; Humidity at 2 meters",
+        "dew_point_2m": "Instant, °C (°F); Dew point at 2 meters",
+        "apparent_temperature": "Instant, °C (°F); Perceived temperature",
+        "precipitation": "Preceding hour sum, mm (inch); Total precipitation",
+        "rain": "Preceding hour sum, mm (inch); Liquid precipitation",
+        "snowfall": "Preceding hour sum, cm (inch); Snowfall amount",
+        "wind_speed_10m": "Instant, km/h (mph, m/s, kn); Wind speed at 10 meters",
+        "soil_moisture_0_to_7cm": "Instant, m³/m³; Soil moisture at 0-7 cm depth",
+        "et0_fao_evapotranspiration": "Preceding hour sum, mm (inch); Reference Evapotranspiration"
+      },
+      "daily_parameters": {
+        "weather_code": "WMO code; Most severe weather condition",
+        "temperature_2m_max": "°C (°F); Maximum air temperature",
+        "temperature_2m_min": "°C (°F); Minimum air temperature",
+        "precipitation_sum": "mm; Sum of daily precipitation",
+        "sunshine_duration": "Seconds; Sunshine duration",
+        "wind_speed_10m_max": "km/h (mph, m/s, kn); Max wind speed",
+        "et0_fao_evapotranspiration": "mm; Daily evapotranspiration sum"
+      }
+    }
+  },
+  {
+    "url": "https://air-quality-api.open-meteo.com/v1/air-quality",
+    "description": "Air quality forecast endpoint that provides 5-day hourly predictions for various pollutants, UV index, pollen counts, and both European and US Air Quality Indices. Time always starts at 0:00 today.",
+    "parameters": {
+      "required_parameters": {
+        "latitude": "Floating-point; Geographical coordinates (e.g., 52.52,48.85)",
+        "longitude": "Floating-point; Geographical coordinates (e.g., 52.52,48.85)"
+      },
+      "optional_parameters": {
+        "hourly": "String array; List of weather variables for hourly data",
+        "current": "String array; List of variables for current conditions",
+        "domains": "String; auto (default), cams_europe, or cams_global",
+        "timeformat": "String; iso8601 (default) or unixtime",
+        "timezone": "String; GMT (default), auto, or any timezone name from database",
+        "past_days": "Integer (0-92); Number of past days to include",
+        "forecast_days": "Integer (0-7); Number of forecast days (default: 5)",
+        "forecast_hours": "Integer (>0); Number of forecast hours",
+        "past_hours": "Integer (>0); Number of past hours",
+        "start_date": "String (yyyy-mm-dd); Start of time interval",
+        "end_date": "String (yyyy-mm-dd); End of time interval",
+        "start_hour": "String (yyyy-mm-ddThh:mm); Start hour for hourly data",
+        "end_hour": "String (yyyy-mm-ddThh:mm); End hour for hourly data",
+        "cell_selection": "String; nearest (default), land, or sea",
+        "apikey": "String; Required for commercial use only"
+      },
+      "hourly_parameters": {
+        "pm10": "Instant, μg/m³; Particulate matter < 10 µm at 10m above ground",
+        "pm2_5": "Instant, μg/m³; Particulate matter < 2.5 µm at 10m above ground",
+        "carbon_monoxide": "Instant, μg/m³; CO at 10m above ground",
+        "nitrogen_dioxide": "Instant, μg/m³; NO₂ at 10m above ground",
+        "sulphur_dioxide": "Instant, μg/m³; SO₂ at 10m above ground",
+        "ozone": "Instant, μg/m³; O₃ at 10m above ground",
+        "carbon_dioxide": "Instant, ppm; CO₂ at 10m above ground",
+        "ammonia": "Instant, μg/m³; Ammonia concentration (Europe only)",
+        "aerosol_optical_depth": "Instant, Dimensionless; Aerosol optical depth at 550 nm",
+        "methane": "Instant, μg/m³; Methane at 10m above ground",
+        "dust": "Instant, μg/m³; Saharan dust at surface level",
+        "uv_index": "Instant, Index; UV index with clouds",
+        "uv_index_clear_sky": "Instant, Index; UV index without clouds",
+        "alder_pollen": "Instant, Grains/m³; Alder pollen (Europe only)",
+        "birch_pollen": "Instant, Grains/m³; Birch pollen (Europe only)",
+        "grass_pollen": "Instant, Grains/m³; Grass pollen (Europe only)",
+        "mugwort_pollen": "Instant, Grains/m³; Mugwort pollen (Europe only)",
+        "olive_pollen": "Instant, Grains/m³; Olive pollen (Europe only)",
+        "ragweed_pollen": "Instant, Grains/m³; Ragweed pollen (Europe only)",
+        "european_aqi": "Instant, European AQI; Max of individual indices (0-20: good, 20-40: fair, 40-60: moderate, 60-80: poor, 80-100: very poor, >100: extremely poor)",
+        "european_aqi_pm2_5": "Instant, European AQI; PM2.5 specific index",
+        "european_aqi_pm10": "Instant, European AQI; PM10 specific index",
+        "european_aqi_nitrogen_dioxide": "Instant, European AQI; NO₂ specific index",
+        "european_aqi_ozone": "Instant, European AQI; O₃ specific index",
+        "european_aqi_sulphur_dioxide": "Instant, European AQI; SO₂ specific index",
+        "us_aqi": "Instant, U.S. AQI; Max of individual indices (0-50: good, 51-100: moderate, 101-150: unhealthy for sensitive groups, 151-200: unhealthy, 201-300: very unhealthy, 301-500: hazardous)",
+        "us_aqi_pm2_5": "Instant, U.S. AQI; PM2.5 specific index",
+        "us_aqi_pm10": "Instant, U.S. AQI; PM10 specific index",
+        "us_aqi_nitrogen_dioxide": "Instant, U.S. AQI; NO₂ specific index",
+        "us_aqi_ozone": "Instant, U.S. AQI; O₃ specific index",
+        "us_aqi_sulphur_dioxide": "Instant, U.S. AQI; SO₂ specific index",
+        "us_aqi_carbon_monoxide": "Instant, U.S. AQI; CO specific index"
+      }
+    }
+  },
+  {
+    "url": "https://climate-api.open-meteo.com/v1/climate",
+    "description": "Climate projection endpoint that provides access to high-resolution climate model data from multiple models, covering the period from 1950 to 2050. Includes temperature, precipitation, wind, and other climate variables with bias correction.",
+    "parameters": {
+      "required_parameters": {
+        "latitude": "Floating-point; Geographical coordinates (e.g., 52.52,48.85)",
+        "longitude": "Floating-point; Geographical coordinates (e.g., 52.52,48.85)",
+        "start_date": "String (yyyy-mm-dd); Date range between 1950-01-01 and 2050-01-01",
+        "end_date": "String (yyyy-mm-dd); Date range between 1950-01-01 and 2050-01-01",
+        "models": "String array; Comma-separated list of climate models (CMCC_CM2_VHR4, FGOALS_f3_H, HiRAM_SIT_HR, MRI_AGCM3_2_S, EC_Earth3P_HR, MPI_ESM1_2_XR, NICAM16_8S)",
+        "daily": "String array; List of daily weather variable aggregations"
+      },
+      "optional_parameters": {
+        "temperature_unit": "String; celsius (default) or fahrenheit",
+        "wind_speed_unit": "String; kmh (default), ms, mph, or kn",
+        "precipitation_unit": "String; mm (default) or inch",
+        "timeformat": "String; iso8601 (default) or unixtime",
+        "disable_bias_correction": "Boolean; false (default) or true",
+        "cell_selection": "String; land (default), sea, or nearest",
+        "apikey": "String; Required for commercial use only"
+      },
+      "daily_parameters": {
+        "temperature_2m_max": "°C (°F); Maximum daily air temperature at 2 meters",
+        "temperature_2m_min": "°C (°F); Minimum daily air temperature at 2 meters",
+        "temperature_2m_mean": "°C (°F); Mean daily air temperature at 2 meters",
+        "cloud_cover_mean": "%; Mean cloud cover",
+        "relative_humidity_2m_max": "%; Maximum daily relative humidity at 2 meters",
+        "relative_humidity_2m_min": "%; Minimum daily relative humidity at 2 meters",
+        "relative_humidity_2m_mean": "%; Mean daily relative humidity at 2 meters",
+        "soil_moisture_0_to_10cm_mean": "m³/m³; Daily mean soil moisture fraction (MRI_AGCM3_2_S and EC_Earth3P_HR only)",
+        "precipitation_sum": "mm; Sum of daily precipitation (including rain, showers and snowfall)",
+        "rain_sum": "mm; Sum of daily liquid rain",
+        "snowfall_sum": "cm; Sum of daily snowfall",
+        "wind_speed_10m_mean": "km/h (mph, m/s, knots); Mean wind speed at 10 meters",
+        "wind_speed_10m_max": "km/h (mph, m/s, knots); Maximum wind speed at 10 meters",
+        "pressure_msl_mean": "hPa; Daily mean air pressure at mean sea level",
+        "shortwave_radiation_sum": "MJ/m²; Sum of solar radiation"
+      }
+    }
+  }
+]
