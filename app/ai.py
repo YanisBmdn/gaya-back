@@ -190,6 +190,7 @@ class AnthropicClient(LLMClient):
         model: str = SONNET_3_7,
         max_tokens: int = 1024,
         temperature: float = .9,
+        system_prompt: str = ANTHROPIC_SYSTEM_PROMPT,
     ) -> BaseModel:
         messages = self._convert_to_anthropic_format(messages)
 
@@ -203,7 +204,7 @@ class AnthropicClient(LLMClient):
             model=model,
             messages=messages,
             max_tokens=max_tokens,
-            system=ANTHROPIC_SYSTEM_PROMPT,
+            system=system_prompt,
             temperature=temperature
         )
 

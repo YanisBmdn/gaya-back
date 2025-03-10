@@ -169,6 +169,7 @@ class NormalizedOpenMeteoData(BaseModel):
         return "\n".join(description)
 
 
+
 #--- API SCHEMA ---#
 
 class ChatVisualizationRequest(BaseModel):
@@ -186,3 +187,15 @@ class ChatVisualizationResponse(BaseModel):
 
 class ChatExplanationResponse(BaseModel):
     explanation: str = Field(description="The explanation generated for the user")
+
+class ScenarioRequest(BaseModel):
+    chat_id: str = Field(description="The chat ID of the user")
+    age_group: str = Field(description="The age of the user")
+    location: str = Field(description="The location of interest")
+    user_description: str = Field(description="The description of the user")
+
+
+class ScenarioResponse(BaseModel):
+    scenario: str = Field(description="The generated scenario")
+    budget: int = Field(description="The budget for the selected scenario")
+    options: List[str] = Field(description="The options available for the selected scenario")

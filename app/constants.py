@@ -11,3 +11,10 @@ SONNET_3_7 = "claude-3-7-sonnet-20250219"
 DEVELOPER = "developer"
 USER = "user"
 ASSISTANT = "assistant"
+
+## Scenarios
+
+AVAILABLE_SCENARIOS = [
+    "Temperature",
+    "Air Pollution",
+]

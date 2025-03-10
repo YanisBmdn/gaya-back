@@ -3,7 +3,7 @@
 #########################
 
 VISUALIZATION_NEED_PROMPT = """
-You are a precise classifier. Determine if the given text suggests a need for environmental data visualization.
+You are a precise classifier. Determine if the given prompt could use an environmental data visualization to help explain things.
 Set the need_visualization variable ONLY to 1 if visualization is needed, or 0 if not.
 Set the topic_of_interest variable to the main topic of interest mentioned in the text. It MUST be related to climate change (e.g., temperature trends, air quality, precipitation).
 Consider broad interpretations of visualization needs, including trends, patterns, comparisons, or spatial/temporal analyses.
@@ -221,37 +221,17 @@ Here's a preview of the data:
 ########################
 
 EXPLANATION_PLAN_PROMPT = """
-Given a climate visualization, create a detailed explanation plan that will help facilitate public understanding and discussion. Structure your response as follows:
+Given a climate visualization, create a detailed explanation plan to help the user better understand the visualization so he can make more sound decisions.
 
-# Visual Elements Analysis
-List the key visual components present in the visualization
-Identify the data representations used (charts, graphs, colors, etc.)
-Note any significant patterns or trends immediately visible
+You should tailor the plan to fit the user persona.
+{persona}
 
+The goal of the explanation is to make the user more aware of the climate change trends and patterns, and how they can relate to the visualization.
 
-# Core Message Identification
-What is the primary climate-related message this visualization conveys?
-Which specific climate aspects or issues are being highlighted?
-What is the temporal and geographic scope of the data?
-
-
-# Technical Accuracy Assessment
-Highlight any statistical or scientific concepts that need explanation
-
-
-# Public Engagement Considerations
-Which aspects might be most relevant to public discourse?
-What common misconceptions might this visualization address?
-Which elements might need additional context for public understanding?
-
-
-# Discussion Points
-List key questions this visualization might prompt
-Identify potential topics for group discussion
-Note any related climate issues this could lead into
-
-Please provide a structured outline addressing these elements that will guide the detailed explanation.
+Please provide a structured outline addressing important elements of the visualization to help guide the user into making decisions.
 """
+
+
 EXPLANATION_GENERATION_PROMPT = """
 Based on the explanation plan provided, generate a comprehensive yet accessible explanation of the climate visualization. Your explanation should:
 
@@ -261,7 +241,18 @@ Here's information about the data that has been used
 {data_description}
 
 Ensure your explanation is clear, short and engaging.
-Use clear, accessible language while maintaining scientific accuracy. Avoid jargon where possible, but explain necessary technical terms. Include relevant comparisons and real-world examples to make the information more relatable.
+"""
+
+SCENARIO_GENERATION_PROMPT = """
+Create a realistic civic decision-making scenario for {location}. The scenario should:
+1. Present a specific local government or community decision with a budget of approximately that seems realistic for the location (Big city would be around 1M$, small town around 100k$)
+2. Offer 4 distinct policy or infrastructure options that adress issues in the city. (Education, Infrastructure, etc.)
+3. Present one option that MUST be linked to the topic of {climate_topic}
+4. Include local context and locations into the scenario and problem that may be known to citizens (e.g., recent extreme weather events, bad road infrastructure, etc.)
+5. Be written in a neutral tone that doesn't favor any particular option
+6. Include a brief explanation of why this decision is relevant to local residents
+
+Focus on making the scenario believable, locally relevant, and engaging for the user.
 """
 
 
@@ -344,6 +335,7 @@ You are generating visualizations for users with moderate literacy in data visua
 OUTPUT_LANGUAGE_PROMPT = """
 For your answer, whether it's code, text or a visualization provide all the text that will be shown to the user in English.
 This includes any labels, titles, descriptions, or explanations that will be directly visible to the user.
+
 If your output is code, it should follow conventions and be written using English.
 """
 

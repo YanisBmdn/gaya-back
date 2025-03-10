@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .models import ChatDescriptionRequest, ChatVisualizationRequest, ChatVisualizationResponse
+from .models import ChatDescriptionRequest, ChatVisualizationRequest, ChatVisualizationResponse, ScenarioRequest, ScenarioResponse
 from dotenv import load_dotenv
 from time import sleep
 load_dotenv()
@@ -9,9 +9,9 @@ from .process import process_user_message
 
 from fastapi.responses import StreamingResponse
 from .ai import anthropic_client
-from .constants import USER
+from .constants import USER, AVAILABLE_SCENARIOS
 
-from .prompts import EXPLANATION_PLAN_PROMPT, EXPLANATION_GENERATION_PROMPT
+from .prompts import EXPLANATION_PLAN_PROMPT, EXPLANATION_GENERATION_PROMPT, SCENARIO_GENERATION_PROMPT
 
 app = FastAPI()
 
@@ -22,6 +22,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+SCENARIO_TOPIC = 0
 
 
 @app.post("/chat/visualization")
@@ -107,6 +109,22 @@ async def describe(request: ChatDescriptionRequest):
         ),
         media_type="text/event-stream"
     )
+
+@app.post("/scenario")
+async def get_scenario(request: ScenarioRequest) -> ScenarioResponse:
+    print(SCENARIO_TOPIC)
+    #SCENARIO_TOPIC = (SCENARIO_TOPIC + 1) % len(AVAILABLE_SCENARIOS)
+    scenario = anthropic_client.structured_completion(
+        messages=[
+            {"role": USER, "content": SCENARIO_GENERATION_PROMPT.format(
+                climate_topic=AVAILABLE_SCENARIOS[0], 
+                location=request.location
+            )}],
+        response_format=ScenarioResponse,
+        system_prompt="You are a policy maker in {request.location} and you have to create a realistic scenario to assess citizen's decision making in public budget allocation"
+    )
+
+    return scenario
 
 @app.get("/test/")
 async def test() -> ChatVisualizationResponse:
