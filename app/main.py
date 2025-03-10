@@ -1,103 +1,60 @@
-import logging
-import json
-import random
-
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from .models import ChatDescriptionRequest, ChatVisualizationRequest, ChatVisualizationResponse
 from dotenv import load_dotenv
-from typing import Type
-import plotly.graph_objects as go
-
-from .prompts import *
-from .models import VisualizationNeed, PersonaSelection, NormalizedOpenMeteoData
-from .utils import figure_to_base64, enhance_plotly_figure, handle_exceptions
-from .visualization import visualization_generation_pipeline
-from .constants import DEVELOPER, USER, DEVELOPER
-from .ai import openai_client, anthropic_client
-
-logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s \n\n')
-
+from time import sleep
 load_dotenv()
 
+from .process import process_user_message
 
-@handle_exceptions()
-def classify_text(text: str, classification_prompt: str, response_format: Type[BaseModel], max_tokens: int = 20) -> BaseModel:
+from fastapi.responses import StreamingResponse
+from .ai import anthropic_client
+from .constants import USER
+
+from .prompts import EXPLANATION_PLAN_PROMPT, EXPLANATION_GENERATION_PROMPT
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+
+@app.post("/chat/visualization")
+async def chat(request: ChatVisualizationRequest) -> ChatVisualizationResponse:
+    try:
+        fig = process_user_message(request.message, request.persona, request.location)
+        return ChatVisualizationResponse(visualization=fig)
+    except:
+        return HTTPException(status_code=500, detail="Internal Server Error")
+
+@app.post("/chat/description")
+async def describe(request: ChatDescriptionRequest):
     """
-    Classify the given text based on the provided prompt.
-
-    Args:
-        text (str): Input text to analyze
-        classification_prompt (str): The prompt to use for classification
-        response_format (BaseModel): The Pydantic model to use for the response format
-        max_tokens (int): The maximum number of tokens to generate
-    Returns:
-        BaseModel: The classified result parsed into the specified response format
-    """
-    response = openai_client.structured_completion(
-        messages=[
-            {"role": DEVELOPER, "content": classification_prompt},
-            {
-                "role": USER,
-                "content": f"Classify this text:\n\n{text}",
-            },
-        ],
-        response_format=response_format,
-        max_tokens=max_tokens,
-        temperature=0.8,
-    )
-
-    return response
-
-
-
-handle_exceptions()
-def set_complexity_level(persona: str) -> tuple[str, str]:
-    """
-    Set the complexity level based on the persona.
-
-    Args:
-        persona (str): The persona name
-
-    Returns:
-        str: The complexity level prompt
-    """
-    with open('personas.json', 'r') as file:
-        personas = json.load(file)
+    API route for generating visualization descriptions with streaming response.
     
-    user_description = next((p['tuning'] for p in personas if p['name'] == persona), None)
-    
-    if not user_description:
-        raise ValueError(f"Persona '{persona}' not found in personas.json")
-
-    complexity_level = classify_text(user_description, COMPLEXITY_MATCHING_PROMPT, PersonaSelection).persona_id
-
-    if complexity_level == 0:
-        return LVL0_VIZ_PROMPT, LVL0_EXP_PROMPT
-    elif complexity_level == 1:
-        return LVL1_VIZ_PROMPT, LVL1_EXP_PROMPT
-    elif complexity_level == 2:
-        return LVL2_VIZ_PROMPT, LVL2_EXP_PROMPT
-    else:
-        raise ValueError("Invalid complexity level")
-
-
-
-@handle_exceptions()
-def describe_visualization(data: list[NormalizedOpenMeteoData], complexity_level: str, fig: go.Figure) -> str:
-    """
-    Describe the visualization based on the given data and complexity level.
-
     Args:
-        data (ProcessedData): The processed data to describe
-        complexity_level (str): The complexity level of the user
-        fig (go.Figure): The generated figure to describe
-
+        request (ChatDescriptionRequest): The request containing chat_id and image
+        
     Returns:
-        str: The description of the visualization
+        StreamingResponse: A streaming response with the visualization description
     """
-    base64_image = figure_to_base64(fig)
+    # Get data from file or use empty string if file not found
+    try:
+        with open(f"{request.chat_id}.txt", "r") as file:
+            data = file.read()
+    except FileNotFoundError:
+        data = ""
+
+    
+    # Get explanation plan
     explanation_plan = anthropic_client.completion(
         messages=[
-            {"role": USER, "content": complexity_level},
+            {"role": USER, "content": "Middle school student"},
             {"role": USER, "content": [
                 {
                     "type": "text",
@@ -105,69 +62,54 @@ def describe_visualization(data: list[NormalizedOpenMeteoData], complexity_level
                 },
                 {
                     "type": "image",
-                    "source": { "type": "base64",
-                                "data": base64_image,
-                                "media_type": "image/png"},
+                    "source": {"type": "base64",
+                              "data": request.image,
+                              "media_type": "image/png"},
                 },
             ]},
         ],
         temperature=0.7,
         max_tokens=300,
     )
-
+    
+    # Prepare data description
     data_description = ""
     for data_point in data:
         data_description += f"{data_point.generate_data_description()}\n\n"
+    
+    # Setup messages for explanation generation
+    messages = [
+        {"role": USER, "content": "Middle school student"},
+        {"role": USER, "content": [
+            {
+                "type": "text",
+                "text": EXPLANATION_GENERATION_PROMPT.format(
+                    explanation_plan=explanation_plan,
+                    data_description=data_description
+                ),
+            },
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "data": request.image,
+                    "media_type": "image/png"
+                },
+            },
+        ]},
+    ]
 
-    response = anthropic_client.completion(
-        messages=[
-            {"role": USER, "content": complexity_level},
-            {"role": USER, "content": [
-                {
-                    "type": "text",
-                    "text": EXPLANATION_GENERATION_PROMPT.format(explanation_plan=explanation_plan, data_description=data_description),
-                },
-                {
-                    "type": "image",
-                    "source": { "type": "base64",
-                                "data": base64_image,
-                                "media_type": "image/png"},
-                },
-            ]},
-        ],
-        temperature=0.7,
-        max_tokens=300,
+    return StreamingResponse(
+        content=anthropic_client.streaming(
+            messages=messages,
+            temperature=0.7,
+            max_tokens=300
+        ),
+        media_type="text/event-stream"
     )
 
-    return response
-
-def main() -> tuple[go.Figure, str]:
-    with open('mock.json', 'r') as file:
-        conversations = json.load(file)
-
-    conversation = random.choice(conversations)
-
-    for message in conversation['messages']:
-        viz_need = classify_text(message['message'], VISUALIZATION_NEED_PROMPT, VisualizationNeed)
-
-        if viz_need.need_visualization:
-            logging.info(f"Needed viz : {message['message']}")
-            logging.info(f"Topic of interest : {viz_need.topic_of_interest}")
-
-            viz_complexity, exp_complexity = set_complexity_level(message['persona'])
-            try:
-                fig, data = visualization_generation_pipeline(message['message'], message['persona'], viz_need.topic_of_interest, viz_complexity)
-                fig = enhance_plotly_figure(fig)
-
-                description = describe_visualization(data, exp_complexity, fig)
-
-                return fig, description
-            except Exception:
-                logging.error(f"Error generating visualization:", exc_info=True)
-                return
-            finally:
-                in_token, out_token = anthropic_client.get_total_tokens()
-
-                print(f"OPENAI spent tokens = {openai_client.get_total_tokens()}")
-                print(f"ANTHROPIC spent tokens = {in_token*0.000003:.2f}$, {out_token*0.000015:.2f}$")
-
+@app.get("/test/")
+async def test() -> ChatVisualizationResponse:
+    sleep(5)
+    viz = '{"data":[{"line":{"color":"red","width":2},"mode":"lines","name":"Average Summer Temperature","x":[1980,1981,1982,1983,1984,1985,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023],"y":[23.840372670807454,23.540372670807454,23.668478260869566,23.36863354037267,24.290372670807454,23.88571428571429,23.43944099378882,23.807608695652174,24.482453416149067,24.02639751552795,24.18726708074534,24.07034161490683,23.739906832298136,23.429192546583852,24.4332298136646,24.122360248447205,23.298757763975157,24.22701863354037,24.27003105590062,24.5166149068323,24.63121118012422,24.039906832298133,24.791459627329193,24.204037267080746,24.595341614906832,24.55667701863354,24.477950310559006,25.057298136645965,24.167080745341615,24.728105590062114,24.645341614906833,24.44347826086957,24.700931677018637,24.32577639751553,24.440993788819874,24.298291925465836,24.467391304347824,24.60512422360248,24.606521739130436,24.486024844720497,24.752484472049687,24.70388198757764,24.367857142857144,24.456211180124225],"type":"scatter"}],"layout":{"template":{"data":{"barpolar":[{"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"rgb(36,36,36)"},"error_y":{"color":"rgb(36,36,36)"},"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"rgb(36,36,36)","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"rgb(36,36,36)"},"baxis":{"endlinecolor":"rgb(36,36,36)","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"rgb(36,36,36)"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"type":"contour"}],"heatmapgl":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"type":"heatmapgl"}],"heatmap":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"type":"histogram2d"}],"histogram":[{"marker":{"line":{"color":"white","width":0.6}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scattergeo"}],"scattergl":[{"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scattergl"}],"scattermapbox":[{"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scattermapbox"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scatterpolar"}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"},"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"rgb(237,237,237)"},"line":{"color":"white"}},"header":{"fill":{"color":"rgb(217,217,217)"},"line":{"color":"white"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":1,"tickcolor":"rgb(36,36,36)","ticks":"outside"}},"colorscale":{"diverging":[[0.0,"rgb(103,0,31)"],[0.1,"rgb(178,24,43)"],[0.2,"rgb(214,96,77)"],[0.3,"rgb(244,165,130)"],[0.4,"rgb(253,219,199)"],[0.5,"rgb(247,247,247)"],[0.6,"rgb(209,229,240)"],[0.7,"rgb(146,197,222)"],[0.8,"rgb(67,147,195)"],[0.9,"rgb(33,102,172)"],[1.0,"rgb(5,48,97)"]],"sequential":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"sequentialminus":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]]},"colorway":["#1F77B4","#FF7F0E","#2CA02C","#D62728","#9467BD","#8C564B","#E377C2","#7F7F7F","#BCBD22","#17BECF"],"font":{"color":"rgb(36,36,36)"},"geo":{"bgcolor":"white","lakecolor":"white","landcolor":"white","showlakes":true,"showland":true,"subunitcolor":"white"},"hoverlabel":{"align":"left"},"hovermode":"closest","mapbox":{"style":"light"},"paper_bgcolor":"white","plot_bgcolor":"white","polar":{"angularaxis":{"gridcolor":"rgb(232,232,232)","linecolor":"rgb(36,36,36)","showgrid":false,"showline":true,"ticks":"outside"},"bgcolor":"white","radialaxis":{"gridcolor":"rgb(232,232,232)","linecolor":"rgb(36,36,36)","showgrid":false,"showline":true,"ticks":"outside"}},"scene":{"xaxis":{"backgroundcolor":"white","gridcolor":"rgb(232,232,232)","gridwidth":2,"linecolor":"rgb(36,36,36)","showbackground":true,"showgrid":false,"showline":true,"ticks":"outside","zeroline":false,"zerolinecolor":"rgb(36,36,36)"},"yaxis":{"backgroundcolor":"white","gridcolor":"rgb(232,232,232)","gridwidth":2,"linecolor":"rgb(36,36,36)","showbackground":true,"showgrid":false,"showline":true,"ticks":"outside","zeroline":false,"zerolinecolor":"rgb(36,36,36)"},"zaxis":{"backgroundcolor":"white","gridcolor":"rgb(232,232,232)","gridwidth":2,"linecolor":"rgb(36,36,36)","showbackground":true,"showgrid":false,"showline":true,"ticks":"outside","zeroline":false,"zerolinecolor":"rgb(36,36,36)"}},"shapedefaults":{"fillcolor":"black","line":{"width":0},"opacity":0.3},"ternary":{"aaxis":{"gridcolor":"rgb(232,232,232)","linecolor":"rgb(36,36,36)","showgrid":false,"showline":true,"ticks":"outside"},"baxis":{"gridcolor":"rgb(232,232,232)","linecolor":"rgb(36,36,36)","showgrid":false,"showline":true,"ticks":"outside"},"bgcolor":"white","caxis":{"gridcolor":"rgb(232,232,232)","linecolor":"rgb(36,36,36)","showgrid":false,"showline":true,"ticks":"outside"}},"title":{"x":0.05},"xaxis":{"automargin":true,"gridcolor":"rgb(232,232,232)","linecolor":"rgb(36,36,36)","showgrid":false,"showline":true,"ticks":"outside","title":{"standoff":15},"zeroline":false,"zerolinecolor":"rgb(36,36,36)"},"yaxis":{"automargin":true,"gridcolor":"rgb(232,232,232)","linecolor":"rgb(36,36,36)","showgrid":false,"showline":true,"ticks":"outside","title":{"standoff":15},"zeroline":false,"zerolinecolor":"rgb(36,36,36)"}}},"shapes":[{"line":{"color":"gray","dash":"dash"},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":24.25440782044043,"y1":24.25440782044043,"yref":"y"}],"annotations":[{"showarrow":false,"text":"Historical Average: 24.3°C","x":1,"xanchor":"right","xref":"x domain","y":24.25440782044043,"yanchor":"top","yref":"y"}],"title":{"font":{"size":16},"text":"Nagoya Summer Temperature Trends (1980-2023)","x":0.5,"xanchor":"center"},"xaxis":{"tickfont":{"size":12},"title":{"text":"Year","font":{"size":14}},"tickmode":"linear","dtick":5,"showgrid":true,"gridwidth":1,"gridcolor":"#E5E5E5","zeroline":true,"zerolinewidth":1,"zerolinecolor":"#808080"},"yaxis":{"tickfont":{"size":12},"title":{"text":"Temperature (°C)","font":{"size":14}},"showgrid":true,"gridwidth":1,"gridcolor":"#E5E5E5","zeroline":true,"zerolinewidth":1,"zerolinecolor":"#808080"},"legend":{"font":{"size":12},"yanchor":"top","y":0.99,"xanchor":"left","x":0.01},"margin":{"t":80,"l":50,"r":50,"b":50},"showlegend":true,"plot_bgcolor":"white","paper_bgcolor":"white","font":{"size":12},"autosize":true}}'
+    return ChatVisualizationResponse(visualization=viz)

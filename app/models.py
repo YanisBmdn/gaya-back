@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from enum import Enum
 import pandas as pd
 
 @dataclass
@@ -168,3 +167,22 @@ class NormalizedOpenMeteoData(BaseModel):
                     description.append(f"{col}: mean={stats[col]['mean']:.2f}, min={stats[col]['min']:.2f}, max={stats[col]['max']:.2f}")
         
         return "\n".join(description)
+
+
+#--- API SCHEMA ---#
+
+class ChatVisualizationRequest(BaseModel):
+    chat_id: str = Field(description="The chat ID of the user")
+    persona: str = Field(description="The persona of the user")
+    message: str = Field(description="The message from the user")
+    location: str = Field(description="The location of interest")
+
+class ChatDescriptionRequest(BaseModel):
+    chat_id: str = Field(description="The chat ID of the user")
+    image: str = Field(description="The base64 image of the visualization to describe")
+
+class ChatVisualizationResponse(BaseModel):
+    visualization: str = Field(description="The visualization generated for the user")
+
+class ChatExplanationResponse(BaseModel):
+    explanation: str = Field(description="The explanation generated for the user")

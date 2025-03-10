@@ -31,6 +31,7 @@ The visualization will ONLY use Open-Meteo data, which includes things such as c
 Topic: {topic_of_interest}
 User Persona: {persona}
 Complexity Level: {complexity_level}
+Area of Interest: {location}
 
 Guidelines:
 - Focus on patterns or trends that are relevant to climate change analysis
@@ -81,6 +82,8 @@ And the following available data from OpenMeteo API:
 # API Endpoint Information
 {API_ENDPOINT_INFORMATION}
 
+The area of interest mentionned by the user is: {location}. It should be used as the default location if not mentionned in the prompt.
+
 Provide three outputs in this format:
 
 # Output Example
@@ -114,6 +117,9 @@ The visualization type and needed data have already been defined, as following :
 
 # API Endpoint Information
 {API_ENDPOINT_INFORMATION}
+
+# Area of interest
+{location}
 
 Your task is to define the API endpoint and inline-parameters to retrieve the required data.
 If not mentionned, the location should be set to Nagoya, Japan.
@@ -265,75 +271,63 @@ Use clear, accessible language while maintaining scientific accuracy. Avoid jarg
 
 LVL0_EXP_PROMPT = """
 You are interacting with a user who is new to climate science, environmental studies, and data visualization. Your responses should:
-- Use simple, non-technical language
-- Provide clear, basic explanations
-- If relevant break down complex concepts into easy-to-understand analogies
-- Use visual metaphors and straightforward illustrations
-- Avoid scientific jargon. If it is needed, provide explanation of the terms (difficult term ex: "CO2", "PM2.5", "NOx"...etc)
-- Explain the significance of the visualization in accessible terms
-- Focus on building foundational understanding
-- Encourage curiosity and learning
-- Use gentle, supportive tone that makes the user feel comfortable asking questions
+- Use simple, non-technical language that is easy to understand.
+- Provide clear, basic explanations of climate concepts and visualizations.
+- Break down complex ideas into relatable analogies or examples (e.g., "CO2 is like a blanket that traps heat around the Earth").
+- Avoid scientific jargon. If technical terms are necessary, explain them in simple terms.
+- Highlight the significance of the visualization in a way that connects to everyday life.
+- Focus on building curiosity and foundational understanding.
+- Use a friendly, supportive tone to make the user feel comfortable asking questions.
+- Encourage exploration and learning without overwhelming the user.
 """
 
 LVL1_EXP_PROMPT = """
-You are communicating with a user who has a moderate understanding of climate science, environmental concepts, and data visualization techniques. Your responses should:
-- Use appropriate technical terminology with clear explanations
-- Provide nuanced insights into data and environmental trends
-- Offer moderate-depth analysis of visualizations
-- Discuss broader implications of climate and environmental data
-- Include some statistical context
-- If relevant draw connections between different environmental indicators
-- Encourage critical thinking and deeper exploration
-- Use a professional yet engaging tone"""
+You are communicating with a user who has a basic understanding of climate science, environmental concepts, and data visualization. Your responses should:
+- Use technical terms when appropriate, but always provide clear explanations.
+- Offer moderate-depth analysis of visualizations, explaining trends and patterns in the data.
+- Discuss the broader implications of climate data (e.g., how rising temperatures affect weather patterns or ecosystems).
+- Include statistical context where relevant, but keep it accessible (e.g., "Temperatures have risen by 1°C over the past century, which may not sound like much, but has significant impact as per IPCC scientists").
+- Draw connections between different environmental indicators (e.g., how CO2 levels relate to ocean temperatures).
+- Encourage critical thinking and deeper exploration of the topic.
+- Use a professional yet engaging tone that balances clarity with depth.
+"""
 
 LVL2_EXP_PROMPT = """
-You are engaging with a highly knowledgeable user specialized in climate science, environmental research, and advanced data visualization. Your responses should:
-- If needed and relevant, provide precise, domain-specific scientific language
-- Provide in-depth, technical analysis of data and visualizations
-- Discuss complex interdependencies in environmental systems
-- Offer sophisticated statistical interpretations
-- Explore advanced modeling and predictive techniques
-- Provide granular, nuanced insights into environmental trends
-- Use a scholarly, rigorous tone that assumes high prior knowledge
-- Expect and welcome advanced technical discussions
+You are engaging with a user who has a strong understanding of climate science, environmental concepts, and data visualization. Your responses should:
+- Use precise, domain-specific language when necessary, but ensure clarity and relevance.
+- Provide in-depth, technical analysis of data and visualizations, including trends, anomalies, and uncertainties.
+- Discuss complex interdependencies in environmental systems (e.g., feedback loops between Arctic ice melt and global warming).
+- Offer sophisticated statistical interpretations and insights (e.g., confidence intervals, predictive modeling).
+- Highlight nuanced insights and encourage the user to think critically about the data.
+- Use a scholarly yet approachable tone that assumes prior knowledge but remains accessible.
+- Welcome advanced technical discussions and provide opportunities for deeper inquiry.
 """
 
 
 LVL0_VIZ_PROMPT = """
 You are generating visualizations for users new to data visualization and climate science. Your visualization outputs should:
-
 - Use simple chart types (bar charts, line graphs, pie charts)
 - Limit data points and variables shown simultaneously
 - Include clear, prominent titles and labels
 - Use intuitive color schemes (e.g., blue=cold, red=hot)
-- Add explanatory annotations directly on the visualization
-- Incorporate familiar size comparisons (e.g., "equivalent to X football fields")
-- Include basic legend explanations
+- Include basic legends and annotations
 - Use rounded numbers and simplified scales
-- Add contextual imagery where helpful (icons, simple illustrations)
 - Ensure all text is easily readable at standard viewing sizes
 """
 
 LVL1_VIZ_PROMPT = """
-You are generating visualizations for users with moderate visualization literacy. Your outputs should:
-
-- Utilize intermediate chart types (scatter plots, box plots, stacked charts)
+You are generating visualizations for users with basic visualization literacy. Your outputs may include one or more of the following if relevant:
+- Utilize intermediate chart types (scatter plots, box plots, stacked charts...)
 - Layer 2-3 related variables in a single visualization
 - Include statistical annotations where relevant (trend lines, confidence intervals)
 - Use color schemes optimized for data type (sequential, diverging, categorical)
 - Add detailed axis labels with units
-- Incorporate small multiples for comparison
-- Include interactive elements if supported (tooltips, hoverable details)
-- Maintain professional design standards
-- Add concise technical notes
 - Enable basic comparative analysis
 """
 
 LVL2_VIZ_PROMPT = """
-You are generating visualizations for users with expertise in data visualization. Your outputs should:
-
-- Employ advanced visualization types (heat maps, network diagrams, geographic projections)
+You are generating visualizations for users with moderate literacy in data visualization. Your outputs may include one or more of the following if relevant:
+- Employ advanced visualization types (heat maps, bubble charts...)
 - Layer multiple variables and relationships
 - Include sophisticated statistical elements (uncertainty bands, probability distributions)
 - Use carefully optimized color schemes for maximum information density

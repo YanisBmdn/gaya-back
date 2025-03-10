@@ -1,5 +1,4 @@
 import requests
-import json
 import logging
 
 import plotly.graph_objects as go
@@ -35,6 +34,7 @@ def determine_visualization_type(
     prompt: str,
     topic_of_interest: str,
     persona: str,
+    location: str,
     complexity_level: str,
 ) -> VisualizationType:
     """
@@ -49,10 +49,10 @@ def determine_visualization_type(
     Returns:
         VisualizationType: Detailed visualization specification
     """
-    system_prompt = str.format(
-        DETERMINE_VISUALIZATION_TYPE_PROMPT,
+    system_prompt = DETERMINE_VISUALIZATION_TYPE_PROMPT.format(
         topic_of_interest=topic_of_interest,
         persona=persona,
+        location=location,
         complexity_level=complexity_level,
     )
 
@@ -70,7 +70,7 @@ def determine_visualization_type(
 
 @handle_exceptions()
 def determine_needed_data(
-    prompt: str, visualization_type: VisualizationType
+    prompt: str, visualization_type: VisualizationType, location: str
 ) -> DataProcessingType:
     """
     Determine data requirements for the visualization
@@ -85,6 +85,7 @@ def determine_needed_data(
 
     system_prompt = DETERMINE_NEEDED_DATA_PROMPT.format(
         visualization_type=visualization_type,
+        location=location,
         API_ENDPOINT_INFORMATION=OpenMeteoAPI.__str__(),
     )
 
@@ -100,7 +101,7 @@ def determine_needed_data(
 
 
 def build_data_retrieval(
-    visualization_type: VisualizationType, needed_data: str
+    visualization_type: VisualizationType, needed_data: str, location: str
 ) -> list[APIEndpoint]:
     """
     Build data retrieval queries for the specified visualization and data requirements
@@ -112,7 +113,7 @@ def build_data_retrieval(
     Returns:
         list[APIEndpoint]: List of API endpoints to query
     """
-    system_prompt = str.format(RETRIEVE_DATA_PROMPT, visualization_type=visualization_type, needed_data=needed_data, API_ENDPOINT_INFORMATION=OpenMeteoAPI.__str__())
+    system_prompt = RETRIEVE_DATA_PROMPT.format(location=location,visualization_type=visualization_type, needed_data=needed_data, API_ENDPOINT_INFORMATION=OpenMeteoAPI.__str__())
 
     response = anthropic_client.structured_completion(
         messages=[
@@ -204,8 +205,7 @@ def process_data(
 
     data_description = [entry.__str__() for entry in data]
 
-    system_prompt = str.format(
-        PROCESS_DATA_PROMPT, 
+    system_prompt = PROCESS_DATA_PROMPT.format(
         visualization_type=visualization_type, 
         processing_steps=processing_steps, 
         data_description=data_description,
@@ -239,7 +239,7 @@ def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, com
         processing_steps=processing_steps,
         data_preview=data.__str__()
     )
-
+ 
     response = anthropic_client.completion(
         messages=[
             {"role": USER, "content": prompt},
@@ -258,9 +258,10 @@ def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, com
 def visualization_generation_pipeline(
     prompt: str,
     persona: str,
+    location: str,
     topic_of_interest: str,
     complexity_level: str,
-) -> tuple[go.Figure, pd.DataFrame]:
+) -> tuple[go.Figure, List[NormalizedOpenMeteoData]]:
     """
     Comprehensive visualization generation pipeline
 
@@ -273,15 +274,15 @@ def visualization_generation_pipeline(
         tuple: Generated figure and processed data
     """
     visualization_details: VisualizationType = determine_visualization_type(
-        prompt, topic_of_interest, persona, complexity_level
+        prompt, topic_of_interest, persona, location, complexity_level
     )
     logging.info(f"Visualization details: {visualization_details}")
-    data_requirements: DataProcessingType = determine_needed_data(prompt, visualization_details)
 
+    data_requirements: DataProcessingType = determine_needed_data(prompt, visualization_details, location)
     logging.info(f"Data requirements: {data_requirements}")
-    # Retrieve data from specified endpoints
+
     api_endpoints = build_data_retrieval(
-        visualization_details, data_requirements.needed_data
+        visualization_details, data_requirements.needed_data, location
     )
 
     logging.info(f"Raw data: {api_endpoints}")

@@ -7,9 +7,9 @@ from enum import Enum
 from openai import OpenAI
 from anthropic import Anthropic
 from pydantic import BaseModel
-from typing import Type, Dict
+from typing import Type, Dict, AsyncGenerator
 
-from .constants import GPT_4o_MINI, SONNET_3_5, DEVELOPER, USER
+from .constants import GPT_4o_MINI, SONNET_3_7, DEVELOPER, USER
 from .prompts import OUTPUT_LANGUAGE_PROMPT, ANTHROPIC_SYSTEM_PROMPT, ANTHROPIC_STRUCTURED_OUTPUT_PROMPT
 from .utils import handle_exceptions
 import tiktoken
@@ -154,7 +154,7 @@ class AnthropicClient(LLMClient):
 
         messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT})
         response = self.client.messages.create(
-            model=SONNET_3_5,
+            model=SONNET_3_7,
             system=ANTHROPIC_SYSTEM_PROMPT,
             messages=messages,
             max_tokens=max_tokens,
@@ -167,11 +167,27 @@ class AnthropicClient(LLMClient):
         return response.content[0].text
     
     @handle_exceptions(default_return=None)
+    async def streaming(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9) -> AsyncGenerator[str, None]:
+        self._convert_to_anthropic_format(messages)
+        try:
+            with self.client.messages.stream(
+                model="claude-3-7-sonnet-20250219",
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=messages,
+            ) as stream:
+                # Change this to a regular for loop, not async for
+                for text in stream.text_stream:
+                    yield text
+        except Exception as e:
+            print(f"Unexpected error in streaming: {str(e)}")
+
+    @handle_exceptions(default_return=None)
     def structured_completion(
         self,
         messages: list[Dict[str, str]],
         response_format: Type[BaseModel],
-        model: str = SONNET_3_5,
+        model: str = SONNET_3_7,
         max_tokens: int = 1024,
         temperature: float = .9,
     ) -> BaseModel:

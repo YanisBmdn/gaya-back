@@ -1,3 +1,4 @@
+import json
 import logging
 import base64
 
@@ -5,6 +6,7 @@ from functools import wraps
 from typing import Callable, Any, TypeVar
 
 import plotly.graph_objects as go
+import plotly
 
 T = TypeVar('T')
 
@@ -42,26 +44,25 @@ def handle_exceptions(
                 return default_return
         return wrapper
     return decorator
-    
 
-def figure_to_base64(fig: go.Figure) -> str:
+    
+def figure_to_json(fig: go.Figure) -> str:
     """
-    Turn a Plotly figure to a base64 encoded image for LLM api queries.
+    Turn a Plotly figure to a JSON serializable dictionary.
 
     Args:
-        fig: The figure to encode
+        fig: The figure to convert
 
     Returns:
-        str: The encoded image in base64
+        dict: The JSON serializable dictionary
 
     """
     try:
-        img_bytes = fig.to_image(format="png", engine="kaleido", width=800)
-        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-        return img_base64
+        fig_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+        return fig_json
 
     except Exception as e:
-        logging.error(f"Error converting figure to base64: {e}")
+        logging.error(f"Error converting figure to JSON: {e}")
         return ""
     
 def enhance_plotly_figure(fig: go.Figure) -> go.Figure:
@@ -104,6 +105,7 @@ def enhance_plotly_figure(fig: go.Figure) -> go.Figure:
         zerolinecolor='#808080'
     )
 
+    """
     # 3. Improve Interactivity
     fig.update_layout(
         hovermode='closest',  # Works for most plot types
@@ -121,6 +123,7 @@ def enhance_plotly_figure(fig: go.Figure) -> go.Figure:
             bgcolor='rgba(255, 255, 255, 0.8)'  # Semi-transparent background
         )
     )
+    """
 
     # 5. Enhanced Accessibility - Generic improvements
     fig.update_layout(
@@ -132,3 +135,19 @@ def enhance_plotly_figure(fig: go.Figure) -> go.Figure:
     )
 
     return fig
+
+
+def dict_to_json_file(conversation_id: int, data: dict) -> None:
+    """
+    Convert a dictionary to a JSON string.
+
+    Args:
+        data: The dictionary to convert
+
+    Returns:
+        str: The JSON string
+
+    """
+    with open(f"conversation_{conversation_id}.json", "a") as f:
+        json.dump(data, f)
+        logging.info(f"Data saved to conversation_{conversation_id}.json")
