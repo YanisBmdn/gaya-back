@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .models import ChatDescriptionRequest, ChatVisualizationRequest, ChatVisualizationResponse, ScenarioRequest, ScenarioResponse
 from dotenv import load_dotenv
@@ -27,15 +27,16 @@ SCENARIO_TOPIC = 0
 
 
 @app.post("/chat/visualization")
-async def chat(request: ChatVisualizationRequest) -> ChatVisualizationResponse:
+async def chat(request: Request, body: ChatVisualizationRequest) -> ChatVisualizationResponse:
+    lang = request.headers.get('Accept-Language')
     try:
-        fig = process_user_message(request.message, request.persona, request.location)
+        fig = process_user_message(body.message, body.persona, body.location, lang)
         return ChatVisualizationResponse(visualization=fig)
     except:
         return HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.post("/chat/description")
-async def describe(request: ChatDescriptionRequest):
+async def describe(request: Request, body: ChatDescriptionRequest):
     """
     API route for generating visualization descriptions with streaming response.
     
@@ -47,10 +48,12 @@ async def describe(request: ChatDescriptionRequest):
     """
     # Get data from file or use empty string if file not found
     try:
-        with open(f"{request.chat_id}.txt", "r") as file:
+        with open(f"{body.chat_id}.txt", "r") as file:
             data = file.read()
     except FileNotFoundError:
         data = ""
+    
+    lang = request.headers.get('Accept-Language')
 
     
     # Get explanation plan
@@ -72,6 +75,7 @@ async def describe(request: ChatDescriptionRequest):
         ],
         temperature=0.7,
         max_tokens=300,
+        lang=lang
     )
     
     # Prepare data description
@@ -105,23 +109,25 @@ async def describe(request: ChatDescriptionRequest):
         content=anthropic_client.streaming(
             messages=messages,
             temperature=0.7,
-            max_tokens=300
+            max_tokens=300,
+            lang=lang
         ),
         media_type="text/event-stream"
     )
 
 @app.post("/scenario")
-async def get_scenario(request: ScenarioRequest) -> ScenarioResponse:
-    print(SCENARIO_TOPIC)
-    #SCENARIO_TOPIC = (SCENARIO_TOPIC + 1) % len(AVAILABLE_SCENARIOS)
+async def get_scenario(request: Request, body: ScenarioRequest) -> ScenarioResponse:
+    lang = request.headers.get('Accept-Language')
+    print(lang)
     scenario = anthropic_client.structured_completion(
         messages=[
             {"role": USER, "content": SCENARIO_GENERATION_PROMPT.format(
                 climate_topic=AVAILABLE_SCENARIOS[0], 
-                location=request.location
+                location=body.location
             )}],
         response_format=ScenarioResponse,
-        system_prompt="You are a policy maker in {request.location} and you have to create a realistic scenario to assess citizen's decision making in public budget allocation"
+        system_prompt="You are a policy maker in {body.location} and you have to create a realistic scenario to assess citizen's decision making in public budget spending / allocation. Depending on the language, adapt the currency for the budget. (e.g. JPY for Japanese, USD for English)",
+        lang=lang
     )
 
     return scenario

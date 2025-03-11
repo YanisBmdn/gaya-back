@@ -232,7 +232,7 @@ def process_data(
 
 
 @handle_exceptions()
-def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, complexity_level, processing_steps) -> go.Figure:
+def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, complexity_level, processing_steps, lang:str = 'en') -> go.Figure:
     prompt = BUILD_VISUALIZATION_PROMPT.format(
         visualization_type=visualization_type,
         complexity_level=complexity_level,
@@ -244,6 +244,7 @@ def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, com
         messages=[
             {"role": USER, "content": prompt},
         ],
+        lang=lang,
         max_tokens=2000,
     )
 
@@ -261,6 +262,7 @@ def visualization_generation_pipeline(
     location: str,
     topic_of_interest: str,
     complexity_level: str,
+    lang: str = 'en'
 ) -> tuple[go.Figure, List[NormalizedOpenMeteoData]]:
     """
     Comprehensive visualization generation pipeline
@@ -289,6 +291,6 @@ def visualization_generation_pipeline(
     normalized_data = retrieve_data(api_endpoints)
 
     # Execute visualization generation
-    fig = process_and_viz(normalized_data, visualization_details, complexity_level, data_requirements.data_processing_steps)
+    fig = process_and_viz(normalized_data, visualization_details, complexity_level, data_requirements.data_processing_steps, lang)
 
     return fig, normalized_data

@@ -246,7 +246,7 @@ Ensure your explanation is clear, short and engaging.
 SCENARIO_GENERATION_PROMPT = """
 Create a realistic civic decision-making scenario for {location}. The scenario should:
 1. Present a specific local government or community decision with a budget of approximately that seems realistic for the location (Big city would be around 1M$, small town around 100k$)
-2. Offer 4 distinct policy or infrastructure options that adress issues in the city. (Education, Infrastructure, etc.)
+2. Offer 4 distinct policy or infrastructure options that adress issues in the city. (Education, Infrastructure, etc.) They should be really short and straightforward (few words)
 3. Present one option that MUST be linked to the topic of {climate_topic}
 4. Include local context and locations into the scenario and problem that may be known to citizens (e.g., recent extreme weather events, bad road infrastructure, etc.)
 5. Be written in a neutral tone that doesn't favor any particular option
@@ -333,7 +333,7 @@ You are generating visualizations for users with moderate literacy in data visua
 ################
 
 OUTPUT_LANGUAGE_PROMPT = """
-For your answer, whether it's code, text or a visualization provide all the text that will be shown to the user in English.
+For your answer, whether it's code, text or a visualization provide all the text that will be shown to the user in {lang}
 This includes any labels, titles, descriptions, or explanations that will be directly visible to the user.
 
 If your output is code, it should follow conventions and be written using English.

@@ -1,6 +1,5 @@
 import json
 import logging
-import base64
 
 from functools import wraps
 from typing import Callable, Any, TypeVar

@@ -38,7 +38,7 @@ class LLMClient(ABC):
         self.output_tokens = 0
 
     @abstractmethod
-    def completion(self, messages: list[Dict[str, str]], max_tokens: int = 100) -> str:
+    def completion(self, messages: list[Dict[str, str]], max_tokens: int = 100, lang:str = 'en') -> str:
         """
         Generate a completion from the language model
         
@@ -52,7 +52,7 @@ class LLMClient(ABC):
         pass
 
     @abstractmethod
-    def structured_completion(self, messages: list[Dict[str, str]], response_format: Type[BaseModel], max_tokens: int = 100) -> BaseModel:
+    def structured_completion(self, messages: list[Dict[str, str]], response_format: Type[BaseModel], max_tokens: int = 100, lang:str = 'en') -> BaseModel:
         """
         Generate a structured completion from the language model
 
@@ -81,8 +81,9 @@ class OpenAIClient(LLMClient):
         model: str = GPT_4o_MINI,
         max_tokens: int = 100,
         temperature: int = 1,
+        lang:str = 'en'
     ) -> str:
-        messages.insert(0, {"role": DEVELOPER, "content": OUTPUT_LANGUAGE_PROMPT})
+        messages.insert(0, {"role": DEVELOPER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
         messages.insert(1, {"role": DEVELOPER, "content": ANTHROPIC_SYSTEM_PROMPT})
 
         response = self.client.chat.completions.create(
@@ -104,9 +105,10 @@ class OpenAIClient(LLMClient):
         max_tokens: int = 100,
         max_completion_tokens: int = None,
         temperature: int = 1,
+        lang:str = 'en',
     ) -> BaseModel:
         """ """
-        messages.insert(0, {"role": DEVELOPER, "content": OUTPUT_LANGUAGE_PROMPT})
+        messages.insert(0, {"role": DEVELOPER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
         messages.insert(1, {"role": DEVELOPER, "content": ANTHROPIC_SYSTEM_PROMPT})
 
         response = self.client.beta.chat.completions.parse(
@@ -149,10 +151,10 @@ class AnthropicClient(LLMClient):
 
 
     @handle_exceptions(default_return="")
-    def completion(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9) -> str:
+    def completion(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9, lang:str='en') -> str:
         self._convert_to_anthropic_format(messages)
 
-        messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT})
+        messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
         response = self.client.messages.create(
             model=SONNET_3_7,
             system=ANTHROPIC_SYSTEM_PROMPT,
@@ -167,8 +169,9 @@ class AnthropicClient(LLMClient):
         return response.content[0].text
     
     @handle_exceptions(default_return=None)
-    async def streaming(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9) -> AsyncGenerator[str, None]:
+    async def streaming(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9, lang:str='en') -> AsyncGenerator[str, None]:
         self._convert_to_anthropic_format(messages)
+        messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
         try:
             with self.client.messages.stream(
                 model="claude-3-7-sonnet-20250219",
@@ -191,9 +194,10 @@ class AnthropicClient(LLMClient):
         max_tokens: int = 1024,
         temperature: float = .9,
         system_prompt: str = ANTHROPIC_SYSTEM_PROMPT,
+        lang:str='en'
     ) -> BaseModel:
         messages = self._convert_to_anthropic_format(messages)
-
+        messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
         output_format_prompt = ANTHROPIC_STRUCTURED_OUTPUT_PROMPT.format(response_format=f"{response_format.__name__}\n{response_format.model_json_schema()}")
         messages.append({
             "role": USER,
