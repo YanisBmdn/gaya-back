@@ -1,13 +1,14 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from .models import ChatDescriptionRequest, ChatVisualizationRequest, ChatVisualizationResponse, ScenarioRequest, ScenarioResponse
+from starlette.responses import StreamingResponse
+from .models import ChatDescriptionRequest, ChatVisualizationRequest, ChatVisualizationResponse, ScenarioRequest, ScenarioResponse, PersonaRequest, ChatRequest
 from dotenv import load_dotenv
 from time import sleep
+import asyncio
 load_dotenv()
 
-from .process import process_user_message
+from .process import process_user_message, set_complexity_level, generate_visualization
 
-from fastapi.responses import StreamingResponse
 from .ai import anthropic_client
 from .constants import USER, AVAILABLE_SCENARIOS
 
@@ -23,17 +24,52 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-SCENARIO_TOPIC = 0
+@app.post("/scenario")
+async def get_scenario(request: Request, body: ScenarioRequest) -> ScenarioResponse:
+    lang = request.headers.get('Accept-Language')
+    print(lang)
+    """
+    scenario = anthropic_client.structured_completion(
+        messages=[
+            {"role": USER, "content": SCENARIO_GENERATION_PROMPT.format(
+                climate_topic=AVAILABLE_SCENARIOS[0], 
+                location=body.location
+            )}],
+        response_format=ScenarioResponse,
+        system_prompt="You are a policy maker in {body.location} and you have to create a realistic scenario to assess citizen's decision making in public budget spending / allocation. Depending on the language, adapt the currency for the budget. (e.g. JPY for Japanese, USD for English)",
+        lang=lang
+    )
+"""
+    scenario = "this the scenario"
+    return ScenarioResponse(scenario="this the scenario", budget= 1000, options=["option1", "option2", "option3"])
+
+
+@app.post("/chat/persona")
+async def get_persona(request: Request, body: PersonaRequest):
+    complexity_level = set_complexity_level(f"{body.description}. My age group is {body.age_group}")
+    return {"complexity_level": complexity_level}
 
 
 @app.post("/chat/visualization")
-async def chat(request: Request, body: ChatVisualizationRequest) -> ChatVisualizationResponse:
+async def visualize(request: Request, body: ChatVisualizationRequest) -> ChatVisualizationResponse:
     lang = request.headers.get('Accept-Language')
     try:
-        fig = process_user_message(body.message, body.persona, body.location, lang)
+        fig = generate_visualization(
+            body.message,
+            body.complexity_level,
+            body.user_description,
+            body.location,
+            body.chat_id,
+            body.scenario,
+            body.topic,
+            body.options,
+            lang
+        )
         return ChatVisualizationResponse(visualization=fig)
-    except:
+    except Exception as e:
+        print(e)
         return HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @app.post("/chat/description")
 async def describe(request: Request, body: ChatDescriptionRequest):
@@ -115,22 +151,33 @@ async def describe(request: Request, body: ChatDescriptionRequest):
         media_type="text/event-stream"
     )
 
-@app.post("/scenario")
-async def get_scenario(request: Request, body: ScenarioRequest) -> ScenarioResponse:
-    lang = request.headers.get('Accept-Language')
-    print(lang)
-    scenario = anthropic_client.structured_completion(
+
+@app.post("/chat")
+async def chat(request: Request, body: ChatRequest):
+    """
+    API route for generating chat responses with streaming response.
+    Args:
+    request (Request): The request containing the chat_id and message
+    Returns:
+    StreamingResponse: A streaming response with the chat responses
+    """
+    lang = request.headers.get('Accept-Language', 'en')
+
+    generator = anthropic_client.streaming(
         messages=[
-            {"role": USER, "content": SCENARIO_GENERATION_PROMPT.format(
-                climate_topic=AVAILABLE_SCENARIOS[0], 
-                location=body.location
-            )}],
-        response_format=ScenarioResponse,
-        system_prompt="You are a policy maker in {body.location} and you have to create a realistic scenario to assess citizen's decision making in public budget spending / allocation. Depending on the language, adapt the currency for the budget. (e.g. JPY for Japanese, USD for English)",
-        lang=lang
+            {"role": USER, "content": body.message}
+        ],
+        temperature=0.7,
+        max_tokens=300,
+        lang=lang)
+    
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream"
     )
 
-    return scenario
+
+
 
 @app.get("/test/")
 async def test() -> ChatVisualizationResponse:

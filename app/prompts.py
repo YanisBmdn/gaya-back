@@ -10,28 +10,37 @@ Consider broad interpretations of visualization needs, including trends, pattern
 """
 
 COMPLEXITY_MATCHING_PROMPT = """
-You are a difficulty level matcher. Identify the content difficulty level based on the given user persona.
+You are a difficulty level matcher. Identify the content difficulty level based on the given user description.
 Choose the most suitable complexity level from the following options:
-
-0 - Beginner: Simple language, basic explanations, analogies, and no jargon. Focus on foundational understanding and curiosity.
-
-1 - Intermediate: Clear technical terms, moderate-depth analysis, connections between trends, and balanced detail with accessible narrative.
-
-2 - Expert: In-depth technical analysis, precise scientific language, advanced models, and nuanced insights with a scholarly tone.
+0 - Foundational: Simple everyday language, visual examples, relatable stories, and connections to daily life. Designed for children, seniors, and those with no prior knowledge.
+1 - Informational: Balanced mix of accessible explanations and some technical concepts, practical applications, and moderate detail. Appropriate for general public with basic awareness.
+2 - Comprehensive: Scientific content with some terminology, data-based discussions, and policy implications. Suitable for knowledgeable citizens with strong interest in climate issues.
 """
 
 ########################
 ## Visualization Prompts
 ########################
 
+SCENARIO_EXPLANATION = """
+The user is participating in a civic decision-making experiment about budget allocation. They are presented with a local government budget allocation scenario that requires them to make an evidence-based choice.
+
+SCENARIO DETAILS:
+{scenario}
+
+DECISION OPTIONS:
+{options}
+
+Your role is to provide information to the user to help him understand and comprehend climate data to promote fact-based decision making. Do not advocate for any specific option - remain neutral while providing factual information.
+"""
+
 DETERMINE_VISUALIZATION_TYPE_PROMPT = """
 Your task is to recommend a climate change visualization using OpenMeteo API data.
 The visualization will ONLY use Open-Meteo data, which includes things such as current weather data, historical weather data, and weather forecasts including temperature, precipitation, wind speed/direction, humidity, and air quality parameters (like PM2.5, PM10, and various gases).
 
 Topic: {topic_of_interest}
-User Persona: {persona}
+User Description: {persona}
 Complexity Level: {complexity_level}
-Area of Interest: {location}
+City / Geographical area of interest {location}
 
 Guidelines:
 - Focus on patterns or trends that are relevant to climate change analysis
@@ -253,6 +262,7 @@ Create a realistic civic decision-making scenario for {location}. The scenario s
 6. Include a brief explanation of why this decision is relevant to local residents
 
 Focus on making the scenario believable, locally relevant, and engaging for the user.
+Do not make the scenario centered around climate change. It should be a general civic decision-making scenario with ONLY one option related to climate change.
 """
 
 

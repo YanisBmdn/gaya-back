@@ -8,6 +8,7 @@ from openai import OpenAI
 from anthropic import Anthropic
 from pydantic import BaseModel
 from typing import Type, Dict, AsyncGenerator
+import asyncio
 
 from .constants import GPT_4o_MINI, SONNET_3_7, DEVELOPER, USER
 from .prompts import OUTPUT_LANGUAGE_PROMPT, ANTHROPIC_SYSTEM_PROMPT, ANTHROPIC_STRUCTURED_OUTPUT_PROMPT
@@ -172,18 +173,16 @@ class AnthropicClient(LLMClient):
     async def streaming(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9, lang:str='en') -> AsyncGenerator[str, None]:
         self._convert_to_anthropic_format(messages)
         messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
-        try:
-            with self.client.messages.stream(
-                model="claude-3-7-sonnet-20250219",
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=messages,
-            ) as stream:
-                # Change this to a regular for loop, not async for
-                for text in stream.text_stream:
-                    yield text
-        except Exception as e:
-            print(f"Unexpected error in streaming: {str(e)}")
+        with self.client.messages.stream(
+            model="claude-3-7-sonnet-20250219",
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=messages,
+        ) as stream:
+            for text in stream.text_stream:
+                print(text, flush=True)
+                yield f"{text}"
+                await asyncio.sleep(0.1)
 
     @handle_exceptions(default_return=None)
     def structured_completion(

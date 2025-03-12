@@ -174,9 +174,13 @@ class NormalizedOpenMeteoData(BaseModel):
 
 class ChatVisualizationRequest(BaseModel):
     chat_id: str = Field(description="The chat ID of the user")
-    persona: str = Field(description="The persona of the user")
-    message: str = Field(description="The message from the user")
+    complexity_level: int = Field(description="The complexity level of the user")
+    user_description: str = Field(description="The description of the user")
     location: str = Field(description="The location of interest")
+    message: str = Field(description="The message from the user")
+    scenario: str = Field(description="The scenario proposed to the user")
+    topic: str = Field(description="The topic of interest for the visualization")
+    options: List[str] = Field(description="The options available for the selected scenario")
 
 class ChatDescriptionRequest(BaseModel):
     chat_id: str = Field(description="The chat ID of the user")
@@ -199,3 +203,10 @@ class ScenarioResponse(BaseModel):
     scenario: str = Field(description="The generated scenario")
     budget: int = Field(description="The budget for the selected scenario")
     options: List[str] = Field(description="The options available for the selected scenario")
+
+class PersonaRequest(BaseModel):
+    description: str = Field(description="The description of the user")
+    age_group: str = Field(description="The age group of the user")
+
+class ChatRequest(BaseModel):
+    message: str = Field(description="The message from the user")

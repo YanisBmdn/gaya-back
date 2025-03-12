@@ -6,7 +6,7 @@ import pandas as pd
 
 from typing import List
 
-from .constants import USER, USER
+from .constants import USER, DEVELOPER
 from .utils import handle_exceptions
 from .api import OpenMeteoAPI
 from .prompts import (
@@ -14,7 +14,8 @@ from .prompts import (
     DETERMINE_NEEDED_DATA_PROMPT,
     RETRIEVE_DATA_PROMPT,
     PROCESS_DATA_PROMPT,
-    BUILD_VISUALIZATION_PROMPT
+    BUILD_VISUALIZATION_PROMPT,
+    SCENARIO_EXPLANATION
 )
 from .models import (
     VisualizationType,
@@ -36,6 +37,8 @@ def determine_visualization_type(
     persona: str,
     location: str,
     complexity_level: str,
+    scenario: str,
+    options: List[str],
 ) -> VisualizationType:
     """
     Determine the visualization type, complexity, and details
@@ -58,6 +61,7 @@ def determine_visualization_type(
 
     response = anthropic_client.structured_completion(
         messages=[
+            {"role": DEVELOPER, "content": SCENARIO_EXPLANATION.format(scenario=scenario, options=options)},
             {"role": USER, "content": system_prompt},
             {"role": USER, "content": prompt},
         ],
@@ -262,7 +266,9 @@ def visualization_generation_pipeline(
     location: str,
     topic_of_interest: str,
     complexity_level: str,
-    lang: str = 'en'
+    scenario: str,
+    options: List[str],
+    lang: str = 'en',
 ) -> tuple[go.Figure, List[NormalizedOpenMeteoData]]:
     """
     Comprehensive visualization generation pipeline
@@ -276,7 +282,7 @@ def visualization_generation_pipeline(
         tuple: Generated figure and processed data
     """
     visualization_details: VisualizationType = determine_visualization_type(
-        prompt, topic_of_interest, persona, location, complexity_level
+        prompt, topic_of_interest, persona, location, complexity_level, scenario, options
     )
     logging.info(f"Visualization details: {visualization_details}")
 
