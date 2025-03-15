@@ -2,10 +2,10 @@ import logging
 
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from typing import Type, List
+from typing import Type, List, Dict
 
 from .prompts import *
-from .models import VisualizationNeed, PersonaSelection
+from .models import VisualizationNeed, PersonaSelection, LLMMessageType
 from .utils import figure_to_json, handle_exceptions
 from .visualization import visualization_generation_pipeline
 from .constants import DEVELOPER, USER, DEVELOPER
@@ -39,7 +39,7 @@ def classify_text(text: str, classification_prompt: str, response_format: Type[B
         ],
         response_format=response_format,
         max_tokens=max_tokens,
-        temperature=0.8,
+        temperature=0.6,
     )
 
     return response
@@ -81,10 +81,10 @@ def get_complexity_level_prompts(complexity_level: int) -> tuple[str,str]:
         case _:
             return LVL0_VIZ_PROMPT, LVL0_EXP_PROMPT
 
-def generate_visualization(message: str, complexity_level: int, user_description: str, location: str, chat_id: str, scenario: str, topic: str, options: List[str], lang: str='en') -> str:
+def generate_visualization(messages: list[Dict[str,str]], complexity_level: int, user_description: str, location: str, chat_id: str, scenario: str, topic: str, options: List[str], lang: str='en') -> str:
         viz_complexity, _ = get_complexity_level_prompts(complexity_level)
         try:
-            fig, data = visualization_generation_pipeline(message, user_description, location, topic, viz_complexity, scenario, options, lang)
+            fig, data = visualization_generation_pipeline(messages, user_description, location, topic, viz_complexity, scenario, options, lang)
             fig = figure_to_json(fig)
 
             data_description = ""
@@ -97,7 +97,7 @@ def generate_visualization(message: str, complexity_level: int, user_description
             return fig
         except:
             logging.error(f"Error generating visualization:", exc_info=True)
-            return "", ""
+            return ""
 
 def process_user_message(message: str, persona: int, location: str, chat_id: str, lang: str='en') -> str:
     """

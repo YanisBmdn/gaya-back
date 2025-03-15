@@ -1,0 +1,5 @@
+Hourly Data:
+Time range: 2025-03-08T00:00 to 2025-03-19T23:00
+pm10: mean=12.52, min=4.10, max=30.80
+pm2_5: mean=10.27, min=3.30, max=28.90
+

@@ -7,11 +7,12 @@ from enum import Enum
 from openai import OpenAI
 from anthropic import Anthropic
 from pydantic import BaseModel
-from typing import Type, Dict, AsyncGenerator
+from typing import Type, Dict, AsyncGenerator, List
 import asyncio
 
-from .constants import GPT_4o_MINI, SONNET_3_7, DEVELOPER, USER
+from .constants import GPT_4o_MINI, SONNET_3_7, DEVELOPER, USER, ASSISTANT
 from .prompts import OUTPUT_LANGUAGE_PROMPT, ANTHROPIC_SYSTEM_PROMPT, ANTHROPIC_STRUCTURED_OUTPUT_PROMPT
+from .models import LLMMessageType
 from .utils import handle_exceptions
 import tiktoken
 
@@ -28,8 +29,10 @@ class LLMClient(ABC):
 
     def __init__(self, client):
         self.client = client
-        self.input_token = 0
-        self.output_token = 0
+        with open('./tokens.csv', "r") as f:
+            tokens = f.read().split(",")
+        self.input_token = int(tokens[0]) or 0
+        self.output_token = int(tokens[1]) or 0
     
     def get_total_tokens(self):
         return self.input_token, self.output_token
@@ -37,6 +40,11 @@ class LLMClient(ABC):
     def reset_token_count(self):
         self.input_tokens = 0
         self.output_tokens = 0
+    
+    def write_tokens_to_file(self):
+        input_token, output_token = self.get_total_tokens()
+        with open('./tokens.csv', "w") as f:
+            f.write(f"{input_token},{output_token}\n")
 
     @abstractmethod
     def completion(self, messages: list[Dict[str, str]], max_tokens: int = 100, lang:str = 'en') -> str:
@@ -134,7 +142,7 @@ class AnthropicClient(LLMClient):
     def __init__(self):
         super().__init__(Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY")))
     
-    def _convert_to_anthropic_format(self, messages: list[Dict[str, str]]) -> list[Dict[str, str]]:
+    def _convert_to_anthropic_format(self, messages: list[Dict[str,str]]) -> list[Dict[str, str]]:
         """
         Convert messages from OpenAI format to Anthropic format
 
@@ -146,19 +154,19 @@ class AnthropicClient(LLMClient):
 
         for i, message in enumerate(messages):
             if message["role"] == DEVELOPER:
-                messages[i]["role"] = USER
+                messages[i]["role"] = ASSISTANT
 
         return messages
 
 
     @handle_exceptions(default_return="")
-    def completion(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9, lang:str='en') -> str:
+    def completion(self, messages: list[Dict[str,str]], max_tokens: int = 100, temperature=.9, lang:str='en', model: str=SONNET_3_7) -> str:
         self._convert_to_anthropic_format(messages)
 
-        messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
+        system_prompt = f"{ANTHROPIC_SYSTEM_PROMPT}\n{OUTPUT_LANGUAGE_PROMPT.format(lang=lang or 'en')}"
         response = self.client.messages.create(
             model=SONNET_3_7,
-            system=ANTHROPIC_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -166,18 +174,19 @@ class AnthropicClient(LLMClient):
 
         self.input_token += response.usage.input_tokens
         self.output_token += response.usage.output_tokens
-
+        self.write_tokens_to_file()
         return response.content[0].text
     
     @handle_exceptions(default_return=None)
-    async def streaming(self, messages: list[Dict[str, str]], max_tokens: int = 100, temperature=.9, lang:str='en') -> AsyncGenerator[str, None]:
+    async def streaming(self, messages: list[Dict[str,str]], max_tokens: int = 100, temperature=.9, lang:str='en') -> AsyncGenerator[str, None]:
         self._convert_to_anthropic_format(messages)
-        messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
+        system_prompt = f"{ANTHROPIC_SYSTEM_PROMPT}\n{OUTPUT_LANGUAGE_PROMPT.format(lang=lang or 'en')}"
         with self.client.messages.stream(
             model="claude-3-7-sonnet-20250219",
             max_tokens=max_tokens,
             temperature=temperature,
             messages=messages,
+            system=system_prompt
         ) as stream:
             for text in stream.text_stream:
                 print(text, flush=True)
@@ -187,7 +196,7 @@ class AnthropicClient(LLMClient):
     @handle_exceptions(default_return=None)
     def structured_completion(
         self,
-        messages: list[Dict[str, str]],
+        messages: list[Dict[str,str]],
         response_format: Type[BaseModel],
         model: str = SONNET_3_7,
         max_tokens: int = 1024,
@@ -196,7 +205,7 @@ class AnthropicClient(LLMClient):
         lang:str='en'
     ) -> BaseModel:
         messages = self._convert_to_anthropic_format(messages)
-        messages.insert(0, {"role": USER, "content": OUTPUT_LANGUAGE_PROMPT.format(lang=lang)})
+        system_prompt = f"{system_prompt}\n{OUTPUT_LANGUAGE_PROMPT.format(lang=lang or 'en')}"
         output_format_prompt = ANTHROPIC_STRUCTURED_OUTPUT_PROMPT.format(response_format=f"{response_format.__name__}\n{response_format.model_json_schema()}")
         messages.append({
             "role": USER,
@@ -213,9 +222,15 @@ class AnthropicClient(LLMClient):
 
         self.input_token += response.usage.input_tokens
         self.output_token += response.usage.output_tokens
+        self.write_tokens_to_file()
 
         # Parse the response into JSON and then into the Pydantic model
         try:
+
+            print('*****************')
+            print(type(response.content[0].text))
+            print(f"\033[96m{response.content[0].text}\033[96m")
+            print('*****************')
             json_response = json.loads(response.content[0].text)
             return response_format.model_validate(json_response)
         except json.JSONDecodeError as e:

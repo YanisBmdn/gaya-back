@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 import pandas as pd
 
 @dataclass
@@ -113,7 +113,6 @@ class APIEndpoint(BaseModel):
 class APIEndpointResponse(BaseModel):
     endpoints: List[APIEndpoint] = Field(description="List of API endpoints to query")
 
-
 class DataProcessingType(BaseModel):
     needed_data: str = Field(description="List of the data needed for visualization, including time range and location")
     data_processing_steps: str = Field(description="Step by step process to prepare data for visualization")
@@ -169,6 +168,9 @@ class NormalizedOpenMeteoData(BaseModel):
         return "\n".join(description)
 
 
+class LLMMessageType(BaseModel):
+    role: str = Field(description="The role of the message sender")
+    content: str = Field(description="The content of the message")
 
 #--- API SCHEMA ---#
 
@@ -177,7 +179,7 @@ class ChatVisualizationRequest(BaseModel):
     complexity_level: int = Field(description="The complexity level of the user")
     user_description: str = Field(description="The description of the user")
     location: str = Field(description="The location of interest")
-    message: str = Field(description="The message from the user")
+    messages: list[Dict[str,str]] = Field(description="The message from the user")
     scenario: str = Field(description="The scenario proposed to the user")
     topic: str = Field(description="The topic of interest for the visualization")
     options: List[str] = Field(description="The options available for the selected scenario")
@@ -185,6 +187,7 @@ class ChatVisualizationRequest(BaseModel):
 class ChatDescriptionRequest(BaseModel):
     chat_id: str = Field(description="The chat ID of the user")
     image: str = Field(description="The base64 image of the visualization to describe")
+    complexity_level: int = Field(description="The persona of the user")
 
 class ChatVisualizationResponse(BaseModel):
     visualization: str = Field(description="The visualization generated for the user")
@@ -197,6 +200,7 @@ class ScenarioRequest(BaseModel):
     age_group: str = Field(description="The age of the user")
     location: str = Field(description="The location of interest")
     user_description: str = Field(description="The description of the user")
+    topic: str = Field(description="The topic of interest for the visualization")
 
 
 class ScenarioResponse(BaseModel):
@@ -209,4 +213,4 @@ class PersonaRequest(BaseModel):
     age_group: str = Field(description="The age group of the user")
 
 class ChatRequest(BaseModel):
-    message: str = Field(description="The message from the user")
+    messages: list[Dict[str,str]] = Field(description="The conversation messages")

@@ -1,0 +1,7 @@
+
+Daily Data:
+Time range: 2000-01-01 to 2023-12-31
+temperature_2m_max: mean=15.85, min=-3.50, max=40.80
+temperature_2m_min: mean=7.93, min=-10.20, max=23.80
+temperature_2m_mean: mean=11.92, min=-5.80, max=32.60
+

@@ -1,0 +1,10 @@
+Hourly Data:
+Time range: 2020-01-01T00:00 to 2023-12-31T23:00
+temperature_2m: mean=12.82, min=-5.70, max=39.20
+
+
+Daily Data:
+Time range: 2020-01-01 to 2023-12-31
+temperature_2m_max: mean=16.92, min=-0.70, max=39.20
+temperature_2m_min: mean=8.72, min=-5.70, max=23.20
+

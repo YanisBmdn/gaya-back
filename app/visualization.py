@@ -2,9 +2,14 @@ import requests
 import logging
 
 import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import numpy as np
+from datetime import datetime
+
 import pandas as pd
 
-from typing import List
+from typing import List, Dict
 
 from .constants import USER, DEVELOPER
 from .utils import handle_exceptions
@@ -24,6 +29,7 @@ from .models import (
     APIEndpointResponse,
     NormalizedOpenMeteoData,
     ProcessedData,
+    LLMMessageType
 )
 from .ai import anthropic_client
 
@@ -32,7 +38,7 @@ from .ai import anthropic_client
 
 @handle_exceptions()
 def determine_visualization_type(
-    prompt: str,
+    messages: list[Dict[str,str]],
     topic_of_interest: str,
     persona: str,
     location: str,
@@ -59,12 +65,13 @@ def determine_visualization_type(
         complexity_level=complexity_level,
     )
 
+    messages.extend([
+        {"role": DEVELOPER, "content": SCENARIO_EXPLANATION.format(scenario=scenario, options=options)},
+        {"role": USER, "content": system_prompt},
+    ])
+
     response = anthropic_client.structured_completion(
-        messages=[
-            {"role": DEVELOPER, "content": SCENARIO_EXPLANATION.format(scenario=scenario, options=options)},
-            {"role": USER, "content": system_prompt},
-            {"role": USER, "content": prompt},
-        ],
+        messages=messages,
         response_format=VisualizationType,
         max_tokens=1000,
         temperature=.5
@@ -100,6 +107,7 @@ def determine_needed_data(
         ],
         response_format=DataProcessingType,
         max_tokens=1000,
+        temperature=.5
     )
     return response
 
@@ -125,7 +133,7 @@ def build_data_retrieval(
         ],
         response_format=APIEndpointResponse,
         max_tokens=800,
-        temperature=.3
+        temperature=.4
     )
 
     return response
@@ -249,11 +257,14 @@ def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, com
             {"role": USER, "content": prompt},
         ],
         lang=lang,
-        max_tokens=2000,
+        max_tokens=4000
     )
 
+    print(response)
     exec(response)
     fig = locals().get("visualize")(data)
+
+    print(fig)
 
 
 
@@ -261,7 +272,7 @@ def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, com
 
 @handle_exceptions(default_return=(None, None))
 def visualization_generation_pipeline(
-    prompt: str,
+    messages: list[Dict[str,str]],
     persona: str,
     location: str,
     topic_of_interest: str,
@@ -282,9 +293,11 @@ def visualization_generation_pipeline(
         tuple: Generated figure and processed data
     """
     visualization_details: VisualizationType = determine_visualization_type(
-        prompt, topic_of_interest, persona, location, complexity_level, scenario, options
+        messages, topic_of_interest, persona, location, complexity_level, scenario, options
     )
     logging.info(f"Visualization details: {visualization_details}")
+
+    prompt = messages[-1]['content']
 
     data_requirements: DataProcessingType = determine_needed_data(prompt, visualization_details, location)
     logging.info(f"Data requirements: {data_requirements}")

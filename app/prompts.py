@@ -45,7 +45,7 @@ City / Geographical area of interest {location}
 Guidelines:
 - Focus on patterns or trends that are relevant to climate change analysis
 - If relevant, consider having subplots or multiple traces (e.g., comparing different locations)
-- Include relevant baselines
+- Keep it simple and clear for the user's understanding. Avoid overly complex visualizations.
 - Match complexity to user expertise level
 - Visualization is achievable ONLY with data from OpenMeteo such as temperature and precipitation.
 - The visualization shouldn't use any external data sources, assets or icons. Use ONLY OpenMeteo data.
@@ -96,12 +96,6 @@ The area of interest mentionned by the user is: {location}. It should be used as
 Provide three outputs in this format:
 
 # Output Example
-Visualization Type: Line chart showing annual temperature trends and 5-year moving average
-Raw temperature data line
-5-year moving average line
-X-axis: years (1980-2023)
-Y-axis: temperature in °C
-
 needed_data:
 Daily mean temperature (temperature_2m_mean)
 Time range: 1980-2023
@@ -180,49 +174,44 @@ Requirements:
 """
 
 BUILD_VISUALIZATION_PROMPT = """
-You have 2 tasks. First, you need to process the raw data for the defined visualization. Second, you need to create a Plotly visualization based on the processed data.
+Create a visualization function with these parameters:
 - Visualization goal: {visualization_type}
 - Complexity Level: {complexity_level}
 - Processing Steps: {processing_steps}
 
-Your only output should be a function that encapsulate both tasks (processing and visualization) with this signature:
+FUNCTION SIGNATURE - USE EXACTLY THIS:
 def visualize(data: List[NormalizedOpenMeteoData]) -> go.Figure:
-    '''
-    Process raw climate data from OpenMeteo API and generate a Plotly visualization.
-    '''
-    import pandas as pd
-    import numpy as np
-    import plotly.graph_objects as go
+    '''Process raw climate data from OpenMeteo API and generate a Plotly visualization.'''
 
+DATA STRUCTURE:
+NormalizedOpenMeteoData is a dataclass with:
+- metadata: Optional[pd.DataFrame] = Field(description="Dataframe containing data unrelated to time resolution")
+- hourly_data: Optional[pd.DataFrame] = Field(description="Dataframe with hourly data")
+- daily_data: Optional[pd.DataFrame] = Field(description="Dataframe with daily data")
 
-Information:
-- NormalizedOpenMeteoData is a dataclass with the following structure:
-    metadata: Optional[pd.DataFrame] = Field(description="Dataframe containing data unrelated to time resolution")
-    hourly_data: Optional[pd.DataFrame] = Field(description="Dataframe with hourly data")
-    daily_data: Optional[pd.DataFrame] = Field(description="Dataframe with daily data")
+Data preview: {data_preview}
 
-Here's a preview of the data:
-{data_preview}
+ALLOWED LIBRARIES - STRICTLY ONLY THESE:
+- pandas (as pd)
+- numpy (as np) 
+- All Plotly libraries (plotly.graph_objects as go, plotly.express as px, plotly.subplots...)
+- typing (for List, Optional)
+- Python standard libraries
 
+REQUIREMENTS:
+1. Use Plotly to create the visualization
+2. Validate input structure
+3. Optimize for large datasets
+4. Clear axes labels and title
+5. Include legend for multiple traces
+6. Avoid cluttering visualization
 
-# Data processing requirements:
-    1. Handle missing or invalid data
-    2. Validate input data structure
-    3. Optimize for performance with large datasets
-
-# Visualization requirements:
-    1. Clear axes labels and title
-    2. Legend if multiple traces
-    3. Optimized for performance
-    4. Be careful about overlapping elements. Don't clutter the visualization
-    5. The visualization will be viewed on a standard desktop screen.
-
-# Output Requirements:
-    1. The only output should be the visualize() function
-    2. Provide the raw code without code block markers or any surrounding text
-    3. Ensure the function is self-contained and does not rely on external variables
-    4. Use ONLY Plotly, numpy, pandas and python standard libraries.
-    5. You must add imports, aliases, and any necessary code to make the function executable.
+CRITICAL OUTPUT RULES:
+1. ONLY output the complete visualize() function
+2. NO code block markers or surrounding text
+3. NO scipy, matplotlib, seaborn, or other external libraries
+4. Function must be self-contained, with all necessary imports inside the function
+5. Keep the code simple and clear. Avoid unnecessary complexity.
 """
 
 ########################
@@ -355,7 +344,8 @@ Your role is to adapt to your audience knowledge level and provide clear visuali
 """
 
 ANTHROPIC_STRUCTURED_OUTPUT_PROMPT = """
-You must respond with valid JSON that STRICTLY AND EXACTLY matches this Python type:
+Your response must be ONLY valid JSON that EXACTLY matches this Python type:
 {response_format}
-Respond only with the JSON, no other text.
+
+Do not include any explanations, only the JSON itself. No markdown, no code blocks, no additional text.
 """
