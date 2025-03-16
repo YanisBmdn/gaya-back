@@ -1,0 +1,4 @@
+Hourly Data:
+Time range: 2025-03-09T00:00 to 2025-03-20T23:00
+us_aqi: mean=60.27, min=27.00, max=118.00
+

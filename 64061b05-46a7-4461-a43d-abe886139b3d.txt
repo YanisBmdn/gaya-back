@@ -1,0 +1,5 @@
+
+Daily Data:
+Time range: 2013-06-01 to 2023-08-31
+temperature_2m_mean: mean=15.61, min=-2.10, max=32.40
+

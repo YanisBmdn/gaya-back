@@ -1,3 +1,4 @@
 ./debug
 ./.ipynb_checkpoints
 ./venv
+.env

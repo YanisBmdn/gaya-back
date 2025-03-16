@@ -106,7 +106,7 @@ def determine_needed_data(
             {"role": USER, "content": prompt},
         ],
         response_format=DataProcessingType,
-        max_tokens=1000,
+        max_tokens=3000,
         temperature=.5
     )
     return response
@@ -257,7 +257,7 @@ def process_and_viz(data: List[NormalizedOpenMeteoData], visualization_type, com
             {"role": USER, "content": prompt},
         ],
         lang=lang,
-        max_tokens=4000
+        max_tokens=8192
     )
 
     print(response)

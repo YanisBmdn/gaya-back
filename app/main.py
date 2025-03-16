@@ -4,6 +4,7 @@ from starlette.responses import StreamingResponse
 from .models import ChatDescriptionRequest, ChatVisualizationRequest, ChatVisualizationResponse, ScenarioRequest, ScenarioResponse, PersonaRequest, ChatRequest
 from dotenv import load_dotenv
 from time import sleep
+import os
 load_dotenv()
 
 from .process import set_complexity_level, generate_visualization, get_complexity_level_prompts
@@ -11,13 +12,13 @@ from .process import set_complexity_level, generate_visualization, get_complexit
 from .ai import anthropic_client
 from .constants import USER, DEVELOPER, AVAILABLE_SCENARIOS
 
-from .prompts import EXPLANATION_PLAN_PROMPT, EXPLANATION_GENERATION_PROMPT, SCENARIO_GENERATION_PROMPT
+from .prompts import EXPLANATION_PLAN_PROMPT, EXPLANATION_GENERATION_PROMPT, SCENARIO_GENERATION_PROMPT, SCENARIO_EXPLANATION
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[os.getenv("FRONT_END_URL")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -84,9 +85,9 @@ async def describe(request: Request, body: ChatDescriptionRequest):
     # Get data from file or use empty string if file not found
     try:
         with open(f"{body.chat_id}.txt", "r") as file:
-            data = file.read()
+            data_description = file.read()
     except FileNotFoundError:
-        data = ""
+        data_description = ""
     
     lang = request.headers.get('Accept-Language')
 
@@ -97,6 +98,10 @@ async def describe(request: Request, body: ChatDescriptionRequest):
         messages=[
             {"role": DEVELOPER, "content": description_complexity},
             {"role": USER, "content": [
+                {
+                    "type": "text",
+                    "text": SCENARIO_EXPLANATION.format(scenario=body.scenario, options=body.options),
+                },
                 {
                     "type": "text",
                     "text": EXPLANATION_PLAN_PROMPT,
@@ -114,14 +119,14 @@ async def describe(request: Request, body: ChatDescriptionRequest):
         lang=lang
     )
     
-    # Prepare data description
-    with open(f"{body.chat_id}.txt", "r") as file:
-        data_description = file.read()
-    
     # Setup messages for explanation generation
     messages = [
         {"role": DEVELOPER, "content": description_complexity},
         {"role": USER, "content": [
+            {
+                    "type": "text",
+                    "text": SCENARIO_EXPLANATION.format(scenario=body.scenario, options=body.options),
+                },
             {
                 "type": "text",
                 "text": EXPLANATION_GENERATION_PROMPT.format(

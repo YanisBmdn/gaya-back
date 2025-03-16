@@ -1,7 +1,10 @@
-
-Daily Data:
-Time range: 2000-01-01 to 2023-12-31
-temperature_2m_max: mean=15.85, min=-3.50, max=40.80
-temperature_2m_min: mean=7.93, min=-10.20, max=23.80
-temperature_2m_mean: mean=11.92, min=-5.80, max=32.60
+Hourly Data:
+Time range: 2025-02-14T00:00 to 2025-03-20T23:00
+us_aqi: mean=62.85, min=25.00, max=118.00
+us_aqi_pm2_5: mean=62.33, min=23.00, max=118.00
+us_aqi_pm10: mean=18.55, min=6.00, max=41.00
+us_aqi_nitrogen_dioxide: mean=24.99, min=2.00, max=59.00
+us_aqi_ozone: mean=21.58, min=1.00, max=74.00
+us_aqi_sulphur_dioxide: mean=6.09, min=1.00, max=16.00
+us_aqi_carbon_monoxide: mean=3.49, min=2.00, max=8.00
 

@@ -188,6 +188,8 @@ class ChatDescriptionRequest(BaseModel):
     chat_id: str = Field(description="The chat ID of the user")
     image: str = Field(description="The base64 image of the visualization to describe")
     complexity_level: int = Field(description="The persona of the user")
+    scenario: str = Field(description="The scenario proposed to the user")
+    options: List[str] = Field(description="The options available for the selected scenario")
 
 class ChatVisualizationResponse(BaseModel):
     visualization: str = Field(description="The visualization generated for the user")

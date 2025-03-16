@@ -1,0 +1,5 @@
+Hourly Data:
+Time range: 2025-03-15T00:00 to 2025-03-15T23:00
+european_aqi: mean=27.25, min=25.00, max=29.00
+us_aqi: mean=53.38, min=51.00, max=56.00
+

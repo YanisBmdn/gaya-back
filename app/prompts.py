@@ -43,7 +43,7 @@ Complexity Level: {complexity_level}
 City / Geographical area of interest {location}
 
 Guidelines:
-- Focus on patterns or trends that are relevant to climate change analysis
+- Focus on medium to long term patterns or trends that are relevant to climate change analysis
 - If relevant, consider having subplots or multiple traces (e.g., comparing different locations)
 - Keep it simple and clear for the user's understanding. Avoid overly complex visualizations.
 - Match complexity to user expertise level
@@ -219,10 +219,17 @@ CRITICAL OUTPUT RULES:
 ########################
 
 EXPLANATION_PLAN_PROMPT = """
+
 Given a climate visualization, create a detailed explanation plan to help the user better understand the visualization so he can make more sound decisions.
 
 You should tailor the plan to fit the user persona.
 {persona}
+
+The scenario that was given to the user is the following : 
+{scenario}
+
+He had to allocate budget in these options :
+{options}
 
 The goal of the explanation is to make the user more aware of the climate change trends and patterns, and how they can relate to the visualization.
 
@@ -250,7 +257,7 @@ Create a realistic civic decision-making scenario for {location}. The scenario s
 5. Be written in a neutral tone that doesn't favor any particular option
 6. Include a brief explanation of why this decision is relevant to local residents
 
-Focus on making the scenario believable, locally relevant, and engaging for the user.
+Focus on making the scenario believable, locally relevant, and engaging for the user. In the scenario description, all options should be equally introduced and with sufficient information to make an informed decision.
 Do not make the scenario centered around climate change. It should be a general civic decision-making scenario with ONLY one option related to climate change.
 """
 
